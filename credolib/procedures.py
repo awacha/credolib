@@ -20,6 +20,8 @@ def _collect_data_for_summarization(headers,raw,reintegrate,qrange):
     data1d=[]
     data2d=0
     headersout=[]
+    if not headers:
+        return
     for head in headers:
         mo = ip.user_ns['mask_override'](head)
         if raw:
@@ -52,6 +54,7 @@ def _collect_data_for_summarization(headers,raw,reintegrate,qrange):
             data1d.append(
                 ex.radial_average(qrange, errorpropagation=3,
                                   abscissa_errorpropagation=3))
+        data1d[-1].save(os.path.join(ip.user_ns['saveto_dir'],'curve_%05d.txt'%head['FSN']))
         data2d=data2d+ex
         headersout.append(ex.header)
     data2d /= len(data1d)
@@ -83,7 +86,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
         samples = sorted(ip.user_ns['allsamplenames'])
     for samplename in samples:
         writemarkdown('## '+samplename)
-        headers_narrowed=[h for h in headers if h['Title']==samplename]
+        headers_sample=[h for h in headers if h['Title']==samplename]
         data2d[samplename] = {}
         data1d[samplename] = {}
         rowavg[samplename] = {}
@@ -103,7 +106,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
         onedimstdaxes=fig_curves.add_axes((0.1,0.1,0.8,0.2))
         for distidx, dist in enumerate(dists):
             writemarkdown("### Distance "+str(dist)+" mm")
-            headers_narrowed=[h for h in headers_narrowed if abs(h['DistCalibrated']-dist)<dist_tolerance]
+            headers_narrowed=[h for h in headers_sample if abs(h['DistCalibrated']-dist)<dist_tolerance]
             distaxes[dist] = fig_2d.add_subplot(
                 nrows, ncols, distidx + 1)
             correlmatrixaxes[dist]=fig_correlmatrices.add_subplot(
@@ -163,7 +166,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
                 c.loglog(axes=onedimaxes)
                 Istd[:,i]=c.Intensity
             if Istd.shape[1]>1:
-                onedimstdaxes.loglog(data1d[samplename][dist][0].q,Istd.std(axis=1),'b-')
+                onedimstdaxes.loglog(data1d[samplename][dist][0].q,Istd.std(axis=1)/Istd.mean(axis=1)*100,'b-')
             if not late_radavg:
                 data1d[samplename][dist] = SASCurve.average(
                     *data1d[samplename][dist])
@@ -236,7 +239,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
         onedimaxes.axis('tight')
         onedimaxes.set_title(samplename)
         onedimstdaxes.set_xlabel('q (' + qunit() + ')')
-        onedimstdaxes.set_ylabel('Std.dev. of intensity')
+        onedimstdaxes.set_ylabel('Rel.std.dev. of intensity (%)')
         onedimstdaxes.grid(True, which='both')
         onedimstdaxes.set_xlim(*onedimaxes.get_xlim())
         putlogo(fig_curves)
