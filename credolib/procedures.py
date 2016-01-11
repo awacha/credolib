@@ -11,6 +11,7 @@ import numpy as np
 import os
 from sastool.classes import SASExposure, SASCurve
 from sastool.misc.errorvalue import ErrorValue
+from sastool.misc.easylsq import nonlinear_odr, FixedParameter
 from sastool.libconfig import qunit
 import ipy_table
 
@@ -273,8 +274,39 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
     ip.user_ns['_headers_tosave'] = headers_tosave
     ip.user_ns['_rowavg']=rowavg
 
+def _merge_two_curves(curve1, curve2, qmin, qmax, qsep, use_additive_constant=False):
+    """Merge two scattering curves
 
-def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_subplotpars={'hspace':0.3}, graph_extension='png', graph_dpi=300):
+    :param curve1: the first curve (longer distance)
+    :type curve1: sastool.classes.curve.GeneralCurve
+    :param curve2: the second curve (shorter distance)
+    :type curve2: sastool.classes.curve.GeneralCurve
+    :param qmin: lower bound of the interval for determining the scaling factor
+    :type qmin: float
+    :param qmax: upper bound of the interval for determining the scaling factor
+    :type qmax: float
+    :param qsep: separating (tailoring) point for the merge
+    :type qsep: float
+    :return: merged_curve, factor, background, stat
+    :rtype tuple of a sastool.classes.curve.SASCurve and a float
+    """
+    if len(curve1.trim(qmin,qmax))>len(curve2.trim(qmin,qmax)):
+        curve2_interp=curve2.trim(qmin,qmax)
+        curve1_interp=curve1.interpolate(curve2_interp.q)
+        print('Interpolated curve1 to curve2')
+    else:
+        curve1_interp=curve1.trim(qmin,qmax)
+        curve2_interp=curve2.interpolate(curve1_interp.q)
+        print('Interpolated curve2 to curve1')
+    if use_additive_constant:
+        bg_init=0
+    else:
+        bg_init=FixedParameter(0)
+    factor, bg, stat=nonlinear_odr(curve2_interp.y, curve1_interp.y, curve2_interp.dy, curve1_interp.dy, lambda x,factor, bg:x*factor+bg,[1,0])
+    return SASCurve.merge(curve1-bg, factor*curve2, qsep), factor, bg, stat
+
+
+def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_subplotpars={'hspace':0.3}, graph_extension='png', graph_dpi=300, additive_constant=False):
     ip = get_ipython()
     data1d = ip.user_ns['_data1d'][samplename]
     print("Uniting measurements of sample %s at different s-d distances" % samplename)
@@ -301,23 +333,30 @@ def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_s
         if united is None:
             united = data1d[dist1]
         if qmin is None:
-            qmin = data1d[dist2].q.min()
+            qmin = data1d[dist2].sanitize(minval=0,fieldname='q').q.min()
             print("        Auto-detected qmin:", qmin,flush=True)
         if qmax is None:
-            qmax = data1d[dist1].q.max()
+            qmax = data1d[dist1].sanitize(minval=0,fieldname='q').q.max()
             print("        Auto-detected qmax:", qmax,flush=True)
         if qsep is None:
             qsep = 0.5 * (qmin + qmax)
             print("        Auto-detected qsep:", qsep,flush=True)
         ax = fig.add_subplot(graph_nrows, graph_ncols, 2 + idx)
         (factor * data1d[dist1]).loglog(axes=ax, label='%.2f mm' % dist1)
-        united, factor = united.unite(
-            data1d[dist2], qmin, qmax, qsep, return_factor=True)
+        united, factor1, bg, stat = _merge_two_curves(united,
+            data1d[dist2], qmin, qmax, qsep, use_additive_constant=additive_constant)
+        factor=factor*factor1
         uniparams['qmin'][idx] = qmin
         uniparams['qmax'][idx] = qmax
         uniparams['qsep'][idx] = qsep
         print("        Scaling factor is", factor.tostring(), flush=True)
-        (factor * data1d[dist2]).loglog(axes=ax, label='%.2f mm' % dist2)
+        if not additive_constant:
+            print("        Additive constant has not been used.",flush=True)
+        else:
+            print("        Additive constant is:",bg.tostring(), flush=True)
+        print("        Reduced Chi^2 of the ODR fit:",stat['Chi2_reduced'], flush=True)
+        print("        DoF of the ODR fit:",stat['DoF'],flush=True)
+        (factor * data1d[dist2]+bg).loglog(axes=ax, label='%.2f mm' % dist2)
         ax.set_xlabel('q (' + qunit() + ')')
         ax.set_ylabel('$d\\Sigma/d\\Omega$ (cm$^{-1}$ sr$^{-1}$)')
         ax.legend(loc='best')
