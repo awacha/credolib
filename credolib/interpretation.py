@@ -6,10 +6,13 @@ from .utils import writemarkdown
 import matplotlib.pyplot as plt
 import numpy as np
 from IPython.display import display
+from IPython.core.getipython import get_ipython
 import ipy_table
+import os
 
-def guinieranalysis(samplenames, qranges=None):
+def guinieranalysis(samplenames, qranges=None,qmax_from_shanum=True, prfunctions_postfix=''):
     figpr=plt.figure()
+    ip=get_ipython()
     axpr=figpr.add_subplot(1,1,1)
     if qranges is None:
         qranges={}
@@ -22,9 +25,16 @@ def guinieranalysis(samplenames, qranges=None):
             qrange=qranges[sn]
         curve=getsascurve(sn)[0].trim(*qrange)
         curve.save(sn+'.dat')
-        Rg, I0, qmin, qmax, quality, aggregation=autorg(sn+'.dat')
+        try:
+            Rg, I0, qmin, qmax, quality, aggregation=autorg(sn+'.dat')
+        except ValueError:
+            print('Error running autorg on %s'%sn)
+            continue
         dmax, nsh, nopt, qmaxopt=shanum(sn+'.dat')
-        curve.trim(qmin,qmaxopt).save(sn+'_optrange.dat')
+        if qmax_from_shanum:
+            curve.trim(qmin,qmaxopt).save(sn+'_optrange.dat')
+        else:
+            curve.trim(qmin,qrange[1]).save(sn+'_optrange.dat')
         gnompr,metadata=datgnom(sn+'_optrange.dat', Rg=Rg.val,noprint=True)
         axpr.errorbar(gnompr[:,0],gnompr[:,1],gnompr[:,2],None,label=sn)
         figsample=plt.figure()
@@ -58,6 +68,7 @@ def guinieranalysis(samplenames, qranges=None):
         axguinier.grid(True, which='both')
         table_gnom.append([sn, metadata['Rg_gnom'].tostring(extra_digits=2), metadata['I0_gnom'].tostring(extra_digits=2), metadata['qmin'], metadata['qmax'], metadata['dmin'], metadata['dmax']])
         table_autorg.append([sn,Rg.tostring(extra_digits=2), I0,'%.3f'%qmin,'%.3f'%qmax,'%.1f %%'%(quality*100), aggregation, '%.3f'%dmax, '%.3f'%qmaxopt])
+        figsample.savefig(os.path.join(ip.user_ns['auximages_dir'],'guinier_%s.png'%sn),dpi=600)
     axpr.set_xlabel('r (nm)')
     axpr.set_ylabel('P(r)')
     axpr.legend(loc='best')
@@ -69,5 +80,8 @@ def guinieranalysis(samplenames, qranges=None):
     writemarkdown('## Results from gnom')
     tab=ipy_table.IpyTable(table_gnom)
     tab.apply_theme('basic')
+    if prfunctions_postfix and prfunctions_postfix[0]!='_':
+        prfunctions_postfix='_'+prfunctions_postfix
+    figpr.savefig(os.path.join(ip.user_ns['auximages_dir'],'prfunctions%s.png'%prfunctions_postfix),dpi=600)
     display(tab)
 
