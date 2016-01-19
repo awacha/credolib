@@ -84,9 +84,57 @@ def kratkyplot(samplename, *args, **kwargs):
                        *args, **kwargs)
     plt.xlabel('q (' + dunit() + ')')
     plt.ylabel('$q^2 d\\Sigma/d\\Omega$ (' +
-               qunit() +
+               dunit() +
                '$^{-2}$ cm$^{-1}$ sr$^{-1}$)')
     plt.legend(loc='best')
+    plt.grid(True, which='both')
+    plt.axis('tight')
+    return ret
+
+def porodplot(samplename, *args, **kwargs):
+    if 'dist' not in kwargs:
+        kwargs['dist'] = None
+    data1d, dist = getsascurve(samplename, kwargs['dist'])
+    del kwargs['dist']
+    if 'factor' in kwargs:
+        factor=kwargs['factor']
+        del kwargs['factor']
+    else:
+        factor=1
+    if 'label' not in kwargs:
+        if isinstance(dist, str):
+            kwargs['label'] = samplename + ' ' + dist
+        else:
+            kwargs['label'] = samplename + ' %g mm' % dist
+    if 'errorbar' in kwargs:
+        errorbars = bool(kwargs['errorbar'])
+        del kwargs['errorbar']
+    else:
+        errorbars = False
+    data1dscaled=data1d*factor
+    if errorbars:
+        if hasattr(data1dscaled, 'dx'):
+            dx=data1dscaled.qError
+            dy=(data1dscaled.Error ** 2 * data1dscaled.q ** 8 +
+                data1dscaled.Intensity ** 2 * data1dscaled.qError ** 2
+                * data1dscaled.q ** 6 * 14) ** 0.5
+        else:
+            dx=None
+            dy=data1dscaled.Error
+        ret = plt.errorbar(data1dscaled.q,
+                           data1dscaled.q ** 4 * data1dscaled.Intensity,
+                           dy, dx, *args, **kwargs)
+    else:
+        ret = plt.plot(data1dscaled.q,
+                       data1dscaled.Intensity * data1dscaled.q ** 2,
+                       *args, **kwargs)
+    plt.xlabel('q (' + dunit() + ')')
+    plt.ylabel('$q^4 d\\Sigma/d\\Omega$ (' +
+               dunit() +
+               '$^{-4}$ cm$^{-1}$ sr$^{-1}$)')
+    plt.legend(loc='best')
+    plt.xscale('power',exponent=4)
+    plt.yscale('linear')
     plt.grid(True, which='both')
     plt.axis('tight')
     return ret
