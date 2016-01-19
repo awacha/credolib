@@ -395,7 +395,7 @@ def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_s
     united.save(os.path.join(ip.user_ns['saveto_dir'], 'united_' + samplename + '.txt'))
     plt.show()
 
-def subtract_bg(samplename, bgname, factor=1, disttolerance=0,
+def subtract_bg(samplename, bgname, factor=1, distance=None, disttolerance=2,
                 subname=None, qrange=(), graph_extension='png', graph_dpi=300):
     """Subtract background from measurements.
 
@@ -406,6 +406,8 @@ def subtract_bg(samplename, bgname, factor=1, disttolerance=0,
             If None, this constant will be determined by integrating the
             scattering curve in the range given by qrange.
         factor: the background curve will be multiplied by this
+        distance: if None, do the subtraction for all sample-to-detector distances.
+            Otherwise give here the value of the sample-to-detector distance.
         qrange: a tuple (qmin, qmax)
         disttolerance: the tolerance in which two distances are considered
             equal.
@@ -423,7 +425,11 @@ def subtract_bg(samplename, bgname, factor=1, disttolerance=0,
             subname=samplename+'-'+bgname
         else:
             subname=samplename+'-const'
-    for dist in data1d[samplename]:
+    if distance is None:
+        dists=data1d[samplename]
+    else:
+        dists=[d for d in data1d[samplename] if abs(d-distance)<disttolerance]
+    for dist in dists:
         if isinstance(bgname,str):
             if not disttolerance:
                 if dist not in data1d[bgname]:
