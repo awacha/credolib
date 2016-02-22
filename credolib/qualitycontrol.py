@@ -19,9 +19,11 @@ def assess_flux_stability(samplename='Glassy_Carbon'):
     ax2=plt.twinx()
     plt.ylabel('Vacuum pressure (mbar), dotted lines')
     plt.title('Beam flux stability')
-    for sn in sorted(ip.user_ns['_headers_tosave']):
-        if samplename not in sn:
-            continue
+    lines=[]
+    samplenames=sorted([sn_ for sn_ in ip.user_ns['_headers_tosave'] if samplename in sn_])
+    linestyles=['b','g','r','c','m','y','k']
+    lines=[]
+    for sn,ls in zip(samplenames,linestyles):
         print(sn)
         heds=ip.user_ns['_headers_tosave'][sn]
         allheds=[]
@@ -34,14 +36,14 @@ def assess_flux_stability(samplename='Glassy_Carbon'):
         factors=np.array([1/h['NormFactor']/d/0.96 for h,d in zip(allheds,divisor)])
 
         dates=[h['Date'] for h in allheds]
-        ax1.plot(dates,factors,'-',label=sn)
+        lines.extend(ax1.plot(dates,factors,ls+'o',label='Flux (%s)'%sn))
         vacuums=np.array([h['Vacuum'] for h in allheds])
-        ax2.plot(dates,vacuums,':',label=sn,lw=2)
+        lines.extend(ax2.plot(dates,vacuums,ls+'s',label='Vacuum (%s)'%sn,lw=2))
         print('  Measurement duration: %.2f h'%((dates[-1]-dates[0]).total_seconds()/3600.))
         print('  Mean flux: ',factors.mean(),'+/-',factors.std(),'photons/sec')
         print('  RMS variation of flux: ',factors.std()/factors.mean()*100,'%')
         print('  P-P variation of flux: ',(factors.max()-factors.min())/factors.mean()*100,'%')
-    ax1.legend(loc='best')
+    ax1.legend(lines,[l.get_label() for l in lines],loc='best')
     plt.show()
 
 def sum_measurement_times():
