@@ -46,3 +46,13 @@ def print_abscissavalue(q, wavelength=None, distance=None, digits=10):
             retval = retval + " <=> " + formatstring % (radius) + " mm(r)"
     retval = retval + ")"
     return retval
+
+class figsize(object):
+    def __init__(self, sizex, sizey):
+        self._originalsize=plt.rcParams['figure.figsize']
+        plt.rcParams['figure.figsize']=(sizex, sizey)
+    def __enter__(self):
+        pass
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        plt.rcParams['figure.figsize']=self._originalsize
+        return False # we don't want to suppress the exception, if any

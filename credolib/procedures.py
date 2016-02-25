@@ -7,6 +7,8 @@ from .calculation import correlmatrix
 from .plotting import plotsascurve
 from .io import get_different_distances
 import matplotlib.pyplot as plt
+import matplotlib
+from mpl_toolkits.axes_grid import make_axes_locatable
 import numpy as np
 import os
 from sastool.classes import SASExposure, SASCurve
@@ -66,7 +68,38 @@ def _collect_data_for_summarization(headers,raw,reintegrate,qrange):
 def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
               samples=None, raw=False, late_radavg=True, graph_ncols=3,
               std_multiplier=3, graph_extension='png',
-              graph_dpi=300):
+              graph_dpi=80, correlmatrix_colormap='coolwarm',
+              image_colormap='viridis'):
+    """Summarize scattering patterns and curves for all samples defined 
+    by the global `allsamplenames`.
+    
+    Inputs:
+        reintegrate (bool, default=True): if the curves are to be obained
+            by reintegrating the patterns. Otherwise 1D curves are loaded.
+        dist_tolerance (float, default=3): sample-to-detector distances
+            nearer than this are considered the same
+        qranges (dict): a dictionary mapping approximate sample-to-detector
+            distances (within dist_tolerance) to one-dimensional np.ndarrays
+            of the desired q-range of the reintegration.
+        samples (list or None): the names of the samples to summarize. If
+            None, all samples defined by ``allsamplenames`` are used.
+        raw (bool, default=False): if raw images are to be treated instead
+            the evaluated ones (default).
+        late_radavg (bool, default=True): if the scattering curves are to
+            be calculated from the summarized scattering pattern. If False,
+            scattering curves are calculated from each pattern and will be
+            averaged.
+        graph_ncols: the number of columns in graphs (2D patterns, 
+            correlation matrices)
+        std_multiplier: if the absolute value of the relative discrepancy 
+            is larger than this limit, the exposure is deemed an outlier.
+        graph_extension: the extension of the produced hardcopy files.
+        graph_dpi: resolution of the graphs
+        correlmatrix_colormap: name of the colormap to be used for the
+            correlation matrices (resolved by matplotlib.cm.get_cmap())
+        image_colormap: name of the colormap to be used for the scattering
+            patterns (resolved by matplotlib.cm.get_cmap())
+    """
     if qranges is None:
         qranges={}
     ip = get_ipython()
@@ -82,7 +115,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
         writemarkdown('# Summarizing CORRECTED images.')
         headers = ip.user_ns['_evalheaders']
         rawpart = '' # nothing will be added in the filenames saved
-
+    
     if samples is None:
         samples = sorted(ip.user_ns['allsamplenames'])
     for samplename in samples:
@@ -135,8 +168,9 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
             writemarkdown("- Mean of row averages: "+str(rowavgmean))
             writemarkdown("- Std of row averages: "+str(rowavgstd)+' (%.2f %%)'% (rowavgstd/rowavgmean*100))
 
-            img=correlmatrixaxes[dist].imshow(cmatrix,interpolation='nearest')
-            fig_correlmatrices.colorbar(img,ax=correlmatrixaxes[dist])
+            img=correlmatrixaxes[dist].imshow(cmatrix,interpolation='nearest',cmap=matplotlib.cm.get_cmap(correlmatrix_colormap))
+            cax=make_axes_locatable(correlmatrixaxes[dist]).append_axes('right',size="5%",pad=0.05)
+            fig_correlmatrices.colorbar(img,cax=cax)
             correlmatrixaxes[dist].set_title('%.2f mm'%dist)
             fsnaxes=np.array([h['FSN'] for h in headers_tosave[samplename][dist]])
             correlmatrixaxes[dist].set_xticks(list(range(len(data1d[samplename][dist]))))
@@ -152,7 +186,8 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
             # Plot the image
             try:
                 data2d[samplename][dist].plot2d(
-                   zscale='log10', axes=distaxes[dist], crosshair=False)
+                   zscale='log10', axes=distaxes[dist], crosshair=False,
+                   cmap=matplotlib.cm.get_cmap(image_colormap))
             except ValueError:
                 print('Error plotting 2D image for sample %s, distance %.2f'%(samplename, dist))
             distaxes[dist].set_xlabel('q (' + qunit() + ')')
@@ -306,7 +341,7 @@ def _merge_two_curves(curve1, curve2, qmin, qmax, qsep, use_additive_constant=Fa
     return SASCurve.merge(curve1-bg, factor*curve2, qsep), factor, bg, stat
 
 
-def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_subplotpars={'hspace':0.3}, graph_extension='png', graph_dpi=300, additive_constant=False):
+def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_subplotpars={'hspace':0.3}, graph_extension='png', graph_dpi=80, additive_constant=False):
     ip = get_ipython()
     data1d = ip.user_ns['_data1d'][samplename]
     print("Uniting measurements of sample %s at different s-d distances" % samplename)
@@ -396,7 +431,7 @@ def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_s
     plt.show()
 
 def subtract_bg(samplename, bgname, factor=1, distance=None, disttolerance=2,
-                subname=None, qrange=(), graph_extension='png', graph_dpi=300):
+                subname=None, qrange=(), graph_extension='png', graph_dpi=80):
     """Subtract background from measurements.
 
     Inputs:
