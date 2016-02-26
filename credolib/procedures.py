@@ -337,8 +337,19 @@ def _merge_two_curves(curve1, curve2, qmin, qmax, qsep, use_additive_constant=Fa
         bg_init=0
     else:
         bg_init=FixedParameter(0)
-    factor, bg, stat=nonlinear_odr(curve2_interp.y, curve1_interp.y, curve2_interp.dy, curve1_interp.dy, lambda x,factor, bg:x*factor+bg,[1,0])
+    factor, bg, stat=nonlinear_odr(curve2_interp.y, curve1_interp.y, curve2_interp.dy, curve1_interp.dy, lambda x,factor, bg:x*factor+bg,[1,bg_init])
     return SASCurve.merge(curve1-bg, factor*curve2, qsep), factor, bg, stat
+
+def _scale_two_exposures(exp1,exp2,qmin,qmax,N=10,use_additive_constant=False):
+    qrange=np.linspace(qmin,qmax,N)
+    rad1=exp1.radial_average(qrange=qrange)
+    rad2=exp2.radial_average(qrange=qrange)
+    if use_additive_constant:
+        bg_init = 0
+    else:
+        bg_init=FixedParameter(0)
+    factor,bg,stat=nonlinear_odr(rad2.y,rad1.y,rad2.dy,rad1.dy,lambda x,factor,bg:x*factor+bg,[1,bg_init])
+    return factor,bg
 
 
 def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_subplotpars={'hspace':0.3}, graph_extension='png', graph_dpi=80, additive_constant=False):
