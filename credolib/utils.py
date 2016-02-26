@@ -1,4 +1,4 @@
-__all__=['writemarkdown','putlogo','print_abscissavalue']
+__all__=['writemarkdown','putlogo','print_abscissavalue','figsize']
 from IPython.display import display,Markdown
 from IPython.core.getipython import get_ipython
 import matplotlib.pyplot as plt

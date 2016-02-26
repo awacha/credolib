@@ -169,7 +169,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
             writemarkdown("- Std of row averages: "+str(rowavgstd)+' (%.2f %%)'% (rowavgstd/rowavgmean*100))
 
             img=correlmatrixaxes[dist].imshow(cmatrix,interpolation='nearest',cmap=matplotlib.cm.get_cmap(correlmatrix_colormap))
-            cax=make_axes_locatable(correlmatrixaxes[dist]).append_axes('right',size="5%",pad=0.05)
+            cax=make_axes_locatable(correlmatrixaxes[dist]).append_axes('right',size="5%",pad=0.1)
             fig_correlmatrices.colorbar(img,cax=cax)
             correlmatrixaxes[dist].set_title('%.2f mm'%dist)
             fsnaxes=np.array([h['FSN'] for h in headers_tosave[samplename][dist]])
