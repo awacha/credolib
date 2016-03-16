@@ -10,7 +10,7 @@ from IPython.core.getipython import get_ipython
 import ipy_table
 import os
 
-def guinieranalysis(samplenames, qranges=None,qmax_from_shanum=True, prfunctions_postfix='', dist=None, plotguinier=True):
+def guinieranalysis(samplenames, qranges=None,qmax_from_shanum=True, prfunctions_postfix='', dist=None, plotguinier=True, graph_extension='.png'):
     figpr=plt.figure()
     ip=get_ipython()
     axpr=figpr.add_subplot(1,1,1)
@@ -72,7 +72,8 @@ def guinieranalysis(samplenames, qranges=None,qmax_from_shanum=True, prfunctions
         table_gnom.append([sn, metadata['Rg_gnom'].tostring(extra_digits=2), metadata['I0_gnom'].tostring(extra_digits=2), metadata['qmin'], metadata['qmax'], metadata['dmin'], metadata['dmax']])
         table_autorg.append([sn,Rg.tostring(extra_digits=2), I0,'%.3f'%qmin,'%.3f'%qmax,'%.1f %%'%(quality*100), aggregation, '%.3f'%dmax, '%.3f'%qmaxopt])
         if plotguinier:
-            figsample.savefig(os.path.join(ip.user_ns['auximages_dir'],'guinier_%s.png'%sn),dpi=600)
+            figsample.tight_layout()
+            figsample.savefig(os.path.join(ip.user_ns['auximages_dir'],'guinier_%s%s'%(sn,graph_extension)),dpi=600)
         results[sn]={'Rg_autorg':Rg,'I0_autorg':I0,
                      'qmin_autorg':qmin,'qmax_autorg':qmax,
                      'quality':quality,'aggregation':aggregation,
@@ -96,6 +97,7 @@ def guinieranalysis(samplenames, qranges=None,qmax_from_shanum=True, prfunctions
     tab.apply_theme('basic')
     if prfunctions_postfix and prfunctions_postfix[0]!='_':
         prfunctions_postfix='_'+prfunctions_postfix
-    figpr.savefig(os.path.join(ip.user_ns['auximages_dir'],'prfunctions%s.png'%prfunctions_postfix),dpi=600)
+    figpr.tight_layout()
+    figpr.savefig(os.path.join(ip.user_ns['auximages_dir'],'prfunctions%s%s'%(prfunctions_postfix,graph_extension)),dpi=600)
     display(tab)
     return results
