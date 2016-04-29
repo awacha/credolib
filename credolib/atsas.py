@@ -1,4 +1,4 @@
-__all__=['read_gnom_pr','execute_command','autorg', 'shanum','datgnom','dammif','bodies']
+__all__=['read_gnom_pr','execute_command','autorg', 'shanum','datgnom','dammif','bodies','datcmp']
 import numpy as np
 import subprocess
 import itertools
@@ -330,3 +330,38 @@ def bodies(filename, bodytypes=None, prefix=None, fit_timeout=10,Ndummyatoms=200
     display(tab)
     return fittingresults
 
+def datcmp(*curves, alpha=None, adjust=None,test='CORMAP'):
+    if len({len(c) for c in curves}) != 1:
+        raise ValueError('All curves have to be of the same length.')
+    datcmpargs=[]
+    if alpha is not None:
+        datcmpargs.append('--alpha=%f'%alpha)
+    if adjust is not None:
+        datcmpargs.append('--adjust=%s'%adjust)
+    if test is not None:
+        datcmpargs.append('--test=%s'%test)
+    with tempfile.TemporaryDirectory(prefix='credolib_datcmp') as td:
+        for i, c in enumerate(curves):
+            mat=np.zeros((len(c),3))
+            mat[:,0]=c.q
+            mat[:,1]=c.Intensity
+            mat[:,2]=c.Error
+            np.savetxt(os.path.join(td,'curve_%d.dat'%i), mat)
+        results=subprocess.check_output(['datcmp' ]+datcmpargs+[os.path.join(td,'curve_%d.dat'%i) for i in range(len(curves))]).decode('utf-8')
+        matC=np.zeros((len(curves),len(curves)))+np.nan
+        matp=np.zeros((len(curves),len(curves)))+np.nan
+        matpadj=np.zeros((len(curves),len(curves)))+np.nan
+        ok=np.zeros(len(curves))+np.nan
+        for l in results.split('\n'):
+            m=re.match('^\s*(?P<i>\d+)\s*vs\.\s*(?P<j>\d+)\s*(?P<C>\d*\.\d*)\s*(?P<p>\d*\.\d*)\s*(?P<adjp>\d*\.\d*)[\s\*]{1}$',l)
+            if m is not None:
+                i=int(m.group('i'))-1
+                j=int(m.group('j'))-1
+                matC[i,j]=matC[j,i]=float(m.group('C'))
+                matp[i,j]=matp[j,i]=float(m.group('p'))
+                matpadj[i,j]=matpadj[j,i]=float(m.group('adjp'))
+            else:
+                m=re.match('\s*(?P<i>\d+)(?P<ack>[\*\s]{1})\s*',l)
+                if m is not None:
+                    ok[int(m.group('i'))-1]=(m.group('ack')=='*')
+    return matC, matp, matpadj, ok
