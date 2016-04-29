@@ -11,7 +11,7 @@ def getresourcefiles():
     print('Generated resource list:\n  '+'\n  '.join(x for x in reslist)+'\n',flush=True)
     return reslist
 
-setup(name='credolib', version='1.0.0', author='Andras Wacha',
+setup(name='credolib', version='1.1.0', author='Andras Wacha',
       author_email='awacha@gmail.com', url='http://github.com/awacha/credolib',
       description='CREDO Data processing library',
       packages=find_packages(),
