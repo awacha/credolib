@@ -6,6 +6,7 @@ from .utils import writemarkdown, print_abscissavalue, putlogo
 from .calculation import correlmatrix
 from .plotting import plotsascurve
 from .io import get_different_distances
+from .atsas import datcmp
 import matplotlib.pyplot as plt
 import matplotlib
 from mpl_toolkits.axes_grid import make_axes_locatable
@@ -58,12 +59,55 @@ def _collect_data_for_summarization(headers,raw,reintegrate,qrange):
                 ex.radial_average(qrange, errorpropagation=3,
                                   abscissa_errorpropagation=3))
         data1d[-1].save(os.path.join(ip.user_ns['saveto_dir'],'curve_%05d.txt'%head['FSN']))
+        mat=np.zeros((len(data1d[-1]),3))
+        mat[:,0]=data1d[-1].q
+        mat[:,1]=data1d[-1].Intensity
+        mat[:,2]=data1d[-1].Error
+        np.savetxt(os.path.join(ip.user_ns['saveto_dir'],'curve_%s_%05d.dat'%(head['Title'],head['FSN'])), mat)
+        del mat
         data2d=data2d+ex
         headersout.append(ex.header)
     data2d /= len(data1d)
     data2d['MeasTime'] = sum(
         [h['MeasTime'] for h in headersout])
     return data1d, data2d, headersout
+
+def _stabilityassessment(headers, data1d, dist, fig_correlmatrices, correlmatrixaxes, std_multiplier, correlmatrix_colormap,
+                         correlmatrix_filename):
+    # calculate and plot correlation matrix
+    cmatrix,badidx, rowavg=correlmatrix(data1d,std_multiplier)
+    rowavgmean=rowavg.mean()
+    rowavgstd=rowavg.std()
+    writemarkdown('#### Assessing sample stability')
+    writemarkdown("- Mean of row averages: "+str(rowavgmean))
+    writemarkdown("- Std of row averages: "+str(rowavgstd)+' (%.2f %%)'% (rowavgstd/rowavgmean*100))
+
+    img=correlmatrixaxes.imshow(cmatrix,interpolation='nearest',cmap=matplotlib.cm.get_cmap(correlmatrix_colormap))
+    cax=make_axes_locatable(correlmatrixaxes).append_axes('right',size="5%",pad=0.1)
+    fig_correlmatrices.colorbar(img,cax=cax)
+    fsns=[h['FSN'] for h in headers]
+
+    correlmatrixaxes.set_title('%.2f mm'%dist)
+    correlmatrixaxes.set_xticks(list(range(len(data1d))))
+    correlmatrixaxes.set_xticklabels([str(f) for f in fsns],rotation='vertical')
+    correlmatrixaxes.set_yticks(list(range(len(data1d))))
+    correlmatrixaxes.set_yticklabels([str(f) for f in fsns])
+    np.savez_compressed(correlmatrix_filename,
+        correlmatrix=cmatrix, fsns=np.array(fsns))
+
+    #Report table on sample stability
+    tab=[['FSN','Date','Discrepancy','Relative discrepancy ((x-mean(x))/std(x))','Quality', 'Quality (cormap)']]
+    badfsns=[]
+    matC,matp,matpadj,datcmp_ok=datcmp(*data1d)
+    for h,bad,discr,dcmp_ok in zip(headers, badidx,rowavg, datcmp_ok):
+        tab.append([h['FSN'],h['Date'].isoformat(),discr,(discr-rowavgmean)/rowavgstd,["\u2713","\u2718\u2718\u2718\u2718\u2718"][bad],
+                    ["\u2713","\u2718\u2718\u2718\u2718\u2718"][dcmp_ok!=1]])
+        if bad:
+            badfsns.append(h['FSN'])
+    tab=ipy_table.IpyTable(tab)
+    tab.apply_theme('basic')
+    return badfsns, tab
+
 
 def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
               samples=None, raw=False, late_radavg=True, graph_ncols=3,
@@ -123,7 +167,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
         headers_sample=[h for h in headers if h['Title']==samplename]
         data2d[samplename] = {}
         data1d[samplename] = {}
-        rowavg[samplename] = {}
+        #rowavg[samplename] = {}
         headers_tosave[samplename] = {}
         dists=get_different_distances([h for h in headers if h['Title']==samplename], dist_tolerance)
         if not dists:
@@ -160,28 +204,16 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
             (data1d[samplename][dist], data2d[samplename][dist],headers_tosave[samplename][dist]) = \
                 _collect_data_for_summarization(headers_narrowed,raw, reintegrate, qrange)
 
-            # calculate and plot correlation matrix
-            cmatrix,badidx, rowavg[samplename][dist]=correlmatrix(data1d[samplename][dist],std_multiplier)
-            rowavgmean=rowavg[samplename][dist].mean()
-            rowavgstd=rowavg[samplename][dist].std()
-            writemarkdown('#### Assessing sample stability')
-            writemarkdown("- Mean of row averages: "+str(rowavgmean))
-            writemarkdown("- Std of row averages: "+str(rowavgstd)+' (%.2f %%)'% (rowavgstd/rowavgmean*100))
-
-            img=correlmatrixaxes[dist].imshow(cmatrix,interpolation='nearest',cmap=matplotlib.cm.get_cmap(correlmatrix_colormap))
-            cax=make_axes_locatable(correlmatrixaxes[dist]).append_axes('right',size="5%",pad=0.1)
-            fig_correlmatrices.colorbar(img,cax=cax)
-            correlmatrixaxes[dist].set_title('%.2f mm'%dist)
-            fsnaxes=np.array([h['FSN'] for h in headers_tosave[samplename][dist]])
-            correlmatrixaxes[dist].set_xticks(list(range(len(data1d[samplename][dist]))))
-            correlmatrixaxes[dist].set_xticklabels([str(f) for f in fsnaxes],rotation='vertical')
-            correlmatrixaxes[dist].set_yticks(list(range(len(data1d[samplename][dist]))))
-            correlmatrixaxes[dist].set_yticklabels([str(f) for f in fsnaxes])
-            np.savez_compressed(os.path.join(ip.user_ns['saveto_dir'],
-                'correlmatrix_%s_%s' % (
-                    samplename,
-                    ('%.2f' % dist).replace('.' , '_')) + rawpart + '.npz'),
-                correlmatrix=cmatrix, fsns=fsnaxes)
+            badfsns, tab=_stabilityassessment(headers_tosave[samplename][dist],
+                                 data1d[samplename][dist], dist,
+                                 fig_correlmatrices,
+                                 correlmatrixaxes[dist], std_multiplier, correlmatrix_colormap,
+                                 os.path.join(ip.user_ns['saveto_dir'],'correlmatrix_%s_%s' % (
+                                     samplename,
+                                     ('%.2f' % dist).replace('.' , '_')) +
+                                              rawpart + '.npz'))
+            ip.user_ns['badfsns']=set(ip.user_ns['badfsns']).union(badfsns)
+            display(tab)
 
             # Plot the image
             try:
@@ -231,18 +263,6 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
                              data2d[samplename][dist].mask.maskid+'.mat'))
             data1d[samplename][dist].save(os.path.join(ip.user_ns['saveto_dir'], samplename + '_'+('%.2f' % dist).replace('.', '_') + rawpart + '.txt'))
 
-            #Report table on sample stability
-            tab=[['FSN','Date','Discrepancy','Relative discrepancy ((x-mean(x))/std(x))','Quality']]
-            discrmean=rowavg[samplename][dist].mean()
-            discrstd=rowavg[samplename][dist].std()
-            for h,bad,discr in zip(headers_tosave[samplename][dist],
-                                   badidx,rowavg[samplename][dist]):
-                tab.append([h['FSN'],h['Date'].isoformat(),discr,(discr-discrmean)/discrstd,["\u2713","\u2718\u2718\u2718\u2718\u2718"][bad]])
-                if bad:
-                    ip.user_ns['badfsns'].append(h['FSN'])
-            tab=ipy_table.make_table(tab)
-            ipy_table.apply_theme('basic')
-            display(tab)
 
             # Report on qrange and flux
             q_ = data1d[samplename][dist].q
