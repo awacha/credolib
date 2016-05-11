@@ -1,14 +1,16 @@
 __all__=['assess_flux_stability','sum_measurement_times','assess_sample_stability','assess_instrumental_background','assess_transmission']
-from IPython.core.getipython import get_ipython
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
-import numpy as np
 import os
+
 import ipy_table
+import matplotlib.pyplot as plt
+import numpy as np
+from IPython.core.getipython import get_ipython
 from IPython.display import display
-from sastool.misc.easylsq import nonlinear_leastsquares
+from matplotlib.colors import LogNorm
 from sastool.classes import SASHeader, SASMask
+from sastool.misc.easylsq import nonlinear_leastsquares
 from sastool.misc.errorvalue import ErrorValue
+
 
 def assess_flux_stability(samplename='Glassy_Carbon'):
     ip = get_ipython()
@@ -123,11 +125,16 @@ def assess_transmission():
                     transms_seen.append(h['Transm'])
                     transm=ErrorValue(h['Transm'],h['TransmError'])
                     thickness=ErrorValue(h['Thickness'],h['ThicknessError'])
-                    mu=(-transm.log())/thickness
                     try:
-                        invmu=(1/mu).tostring(extra_digits=2)
+                        mu=(-transm.log())/thickness
                     except ZeroDivisionError:
-                        invmu='Infinite'
+                        mu='Infinite'
+                        invmu=0
+                    else:
+                        try:
+                            invmu=(1/mu).tostring(extra_digits=2)
+                        except ZeroDivisionError:
+                            invmu='Infinite'
                     tab.append([sample,dist,transm.tostring(extra_digits=2),mu.tostring(extra_digits=2),invmu])
     tab=ipy_table.IpyTable(tab)
     tab.apply_theme('basic')

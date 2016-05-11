@@ -1,9 +1,11 @@
 __all__=['set_length_units','init_dirs']
 
-from sastool.misc import find_subdirs
-import sastool.libconfig as libconfig
 import os
+
+import sastool.libconfig as libconfig
 from IPython.core.getipython import get_ipython
+from sastool.misc import find_subdirs
+
 
 def set_length_units(units):
     """Set the length units: either 'nm' or 'A'.
@@ -29,6 +31,9 @@ def init_dirs(rootdir, outputpath, saveto_dir='data',
     """
     ip = get_ipython()
     ip.user_ns['credo_root'] = rootdir
+    print("Output files will be written to:", outputpath)
+    os.chdir(outputpath)
+    ip.user_ns['outputpath'] = outputpath
     ip.user_ns['evaldirs'] =  [os.path.join(rootdir, 'eval2d'),
                                os.path.join(rootdir, 'eval2d', 'crd'),
                                os.path.join(rootdir, 'eval1d'),
@@ -49,9 +54,6 @@ def init_dirs(rootdir, outputpath, saveto_dir='data',
         os.mkdir(os.path.join(ip.user_ns['outputpath'], saveto_dir))
     if not os.path.isdir(os.path.join(ip.user_ns['outputpath'], auximages_dir)):
         os.mkdir(os.path.join(ip.user_ns['outputpath'], auximages_dir))
-    print("Output files will be written to:", outputpath)
-    os.chdir(outputpath)
-    ip.user_ns['outputpath'] = outputpath
     ip.user_ns['auximages_dir'] = os.path.join(outputpath, auximages_dir)
     ip.user_ns['saveto_dir'] = os.path.join(outputpath, saveto_dir)
     ip.user_ns['saveto_dir_rel'] = saveto_dir

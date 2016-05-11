@@ -1,14 +1,16 @@
 __all__=['read_gnom_pr','execute_command','autorg', 'shanum','datgnom','dammif','bodies','datcmp']
-import numpy as np
-import subprocess
 import itertools
-import ipy_table
-from IPython.display import display
-import tempfile
 import os
 import re
+import subprocess
+import tempfile
+
+import ipy_table
+import numpy as np
+from IPython.display import display
 from sastool.classes import GeneralCurve, SASCurve
 from sastool.misc.errorvalue import ErrorValue
+
 
 def read_gnom_pr(filename, get_metadata=False):
     metadata={}
@@ -347,21 +349,25 @@ def datcmp(*curves, alpha=None, adjust=None,test='CORMAP'):
             mat[:,1]=c.Intensity
             mat[:,2]=c.Error
             np.savetxt(os.path.join(td,'curve_%d.dat'%i), mat)
-        results=subprocess.check_output(['datcmp' ]+datcmpargs+[os.path.join(td,'curve_%d.dat'%i) for i in range(len(curves))]).decode('utf-8')
         matC=np.zeros((len(curves),len(curves)))+np.nan
         matp=np.zeros((len(curves),len(curves)))+np.nan
         matpadj=np.zeros((len(curves),len(curves)))+np.nan
         ok=np.zeros(len(curves))+np.nan
-        for l in results.split('\n'):
-            m=re.match('^\s*(?P<i>\d+)\s*vs\.\s*(?P<j>\d+)\s*(?P<C>\d*\.\d*)\s*(?P<p>\d*\.\d*)\s*(?P<adjp>\d*\.\d*)[\s\*]{1}$',l)
-            if m is not None:
-                i=int(m.group('i'))-1
-                j=int(m.group('j'))-1
-                matC[i,j]=matC[j,i]=float(m.group('C'))
-                matp[i,j]=matp[j,i]=float(m.group('p'))
-                matpadj[i,j]=matpadj[j,i]=float(m.group('adjp'))
-            else:
-                m=re.match('\s*(?P<i>\d+)(?P<ack>[\*\s]{1})\s*',l)
+        try:
+            results=subprocess.check_output(['datcmp' ]+datcmpargs+[os.path.join(td,'curve_%d.dat'%i) for i in range(len(curves))]).decode('utf-8')
+        except subprocess.CalledProcessError:
+            pass
+        else:
+            for l in results.split('\n'):
+                m=re.match('^\s*(?P<i>\d+)\s*vs\.\s*(?P<j>\d+)\s*(?P<C>\d*\.\d*)\s*(?P<p>\d*\.\d*)\s*(?P<adjp>\d*\.\d*)[\s\*]{1}$',l)
                 if m is not None:
-                    ok[int(m.group('i'))-1]=(m.group('ack')=='*')
+                    i=int(m.group('i'))-1
+                    j=int(m.group('j'))-1
+                    matC[i,j]=matC[j,i]=float(m.group('C'))
+                    matp[i,j]=matp[j,i]=float(m.group('p'))
+                    matpadj[i,j]=matpadj[j,i]=float(m.group('adjp'))
+                else:
+                    m=re.match('\s*(?P<i>\d+)(?P<ack>[\*\s]{1})\s*',l)
+                    if m is not None:
+                        ok[int(m.group('i'))-1]=(m.group('ack')=='*')
     return matC, matp, matpadj, ok

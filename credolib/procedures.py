@@ -1,22 +1,24 @@
 __all__= ['summarize','unite','subtract_bg']
 
+import os
+
+import ipy_table
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
 from IPython.core.getipython import get_ipython
 from IPython.display import display
-from .utils import writemarkdown, print_abscissavalue, putlogo
-from .calculation import correlmatrix
-from .plotting import plotsascurve
-from .io import get_different_distances
-from .atsas import datcmp
-import matplotlib.pyplot as plt
-import matplotlib
 from mpl_toolkits.axes_grid import make_axes_locatable
-import numpy as np
-import os
 from sastool.classes import SASExposure, SASCurve
-from sastool.misc.errorvalue import ErrorValue
-from sastool.misc.easylsq import nonlinear_odr, FixedParameter
 from sastool.libconfig import qunit
-import ipy_table
+from sastool.misc.easylsq import nonlinear_odr, FixedParameter
+from sastool.misc.errorvalue import ErrorValue
+
+from .atsas import datcmp
+from .calculation import correlmatrix
+from .io import get_different_distances
+from .plotting import plotsascurve
+from .utils import writemarkdown, print_abscissavalue, putlogo
 
 
 def _collect_data_for_summarization(headers,raw,reintegrate,qrange):
@@ -46,11 +48,6 @@ def _collect_data_for_summarization(headers,raw,reintegrate,qrange):
             ip.user_ns['badfsns'].append(head['FSN'])
             continue
         ex.header = head
-#                 for keytodelete in ['Wavelength', 'WavelengthCalibrated']:
-#                     try:
-#                         del ex.header[keytodelete]
-#                     except KeyError:
-#                         pass
         if not reintegrate:
             data1d.append(SASCurve(
                 os.path.join(ip.user_ns['onedim_folder'], (ip.user_ns['crd_prefix']+'_%d.txt') % head['FSN'])))
@@ -98,15 +95,19 @@ def _stabilityassessment(headers, data1d, dist, fig_correlmatrices, correlmatrix
     #Report table on sample stability
     tab=[['FSN','Date','Discrepancy','Relative discrepancy ((x-mean(x))/std(x))','Quality', 'Quality (cormap)']]
     badfsns=[]
+    badfsns_datcmp=[]
     matC,matp,matpadj,datcmp_ok=datcmp(*data1d)
+    #datcmp_ok=[not x for x in badidx]
     for h,bad,discr,dcmp_ok in zip(headers, badidx,rowavg, datcmp_ok):
         tab.append([h['FSN'],h['Date'].isoformat(),discr,(discr-rowavgmean)/rowavgstd,["\u2713","\u2718\u2718\u2718\u2718\u2718"][bad],
                     ["\u2713","\u2718\u2718\u2718\u2718\u2718"][dcmp_ok!=1]])
         if bad:
             badfsns.append(h['FSN'])
+        if (not dcmp_ok and not np.isnan(dcmp_ok)):
+            badfsns_datcmp.append(h['FSN'])
     tab=ipy_table.IpyTable(tab)
     tab.apply_theme('basic')
-    return badfsns, tab
+    return badfsns, badfsns_datcmp, tab
 
 
 def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
@@ -204,7 +205,8 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
             (data1d[samplename][dist], data2d[samplename][dist],headers_tosave[samplename][dist]) = \
                 _collect_data_for_summarization(headers_narrowed,raw, reintegrate, qrange)
 
-            badfsns, tab=_stabilityassessment(headers_tosave[samplename][dist],
+            badfsns, badfsns_datcmp, tab=_stabilityassessment(
+                                 headers_tosave[samplename][dist],
                                  data1d[samplename][dist], dist,
                                  fig_correlmatrices,
                                  correlmatrixaxes[dist], std_multiplier, correlmatrix_colormap,
@@ -212,7 +214,12 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
                                      samplename,
                                      ('%.2f' % dist).replace('.' , '_')) +
                                               rawpart + '.npz'))
+            if 'badfsns' not in ip.user_ns:
+                ip.user_ns['badfsns']={}
+            elif 'badfsns_datcmp' not in ip.user_ns:
+                ip.user_ns['badfsns_datcmp']={}
             ip.user_ns['badfsns']=set(ip.user_ns['badfsns']).union(badfsns)
+            ip.user_ns['badfsns_datcmp']=set(ip.user_ns['badfsns_datcmp']).union(badfsns_datcmp)
             display(tab)
 
             # Plot the image
@@ -324,6 +331,8 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
         plt.show()
     writemarkdown("Updated badfsns list:")
     writemarkdown('['+', '.join(str(f) for f in ip.user_ns['badfsns'])+']')
+    writemarkdown("Updated badfsns list using datcmp:")
+    writemarkdown('['+', '.join(str(f) for f in ip.user_ns['badfsns_datcmp'])+']')
     ip.user_ns['_data1d'] = data1d
     ip.user_ns['_data2d'] = data2d
     ip.user_ns['_headers_tosave'] = headers_tosave
