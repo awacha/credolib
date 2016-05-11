@@ -9,7 +9,6 @@ import numpy as np
 from IPython.core.getipython import get_ipython
 from IPython.display import display
 from mpl_toolkits.axes_grid import make_axes_locatable
-from sastool.classes import SASExposure, SASCurve
 from sastool.libconfig import qunit
 from sastool.misc.easylsq import nonlinear_odr, FixedParameter
 from sastool.misc.errorvalue import ErrorValue
@@ -29,42 +28,56 @@ def _collect_data_for_summarization(headers,raw,reintegrate,qrange):
     if not headers:
         return
     for head in headers:
-        mo = ip.user_ns['mask_override'](head)
-        if raw:
-            fileformat = ip.user_ns['crd_prefix']+'_%05d.cbf'
-            dirs = ip.user_ns['datadirs']
-        else:
-            fileformat = ip.user_ns['crd_prefix']+'_%05d.npz'
-            dirs = ip.user_ns['evaldirs']
         try:
-            if mo is not None:
-                ex = SASExposure(
-                    fileformat, head['FSN'], dirs=dirs, maskfile=mo)
-            else:
-                ex = SASExposure(
-                    fileformat, head['FSN'], dirs=dirs)
-        except IOError:
-            print('Could not load 2D file: %s'%(fileformat%head['FSN']))
-            ip.user_ns['badfsns'].append(head['FSN'])
+            mo = ip.user_ns['mask_override'](head)
+        except KeyError:
+            mo = None
+        ex = None
+        for l in ip.user_ns['_loaders']:
+            if l.processed != ~raw:
+                continue
+            try:
+                ex = l.loadexposure(head.fsn)
+                if mo is not None:
+                    ex.mask = l.loadmask(mo)
+                break
+            except FileNotFoundError:
+                continue
+        if ex is None:
+            print('Could not load %s 2D file: for FSN %d' % (['processed', 'raw'][raw], head.fsn))
+            ip.user_ns['badfsns'].append(head.fsn)
             continue
         ex.header = head
+        curve = None
         if not reintegrate:
-            data1d.append(SASCurve(
-                os.path.join(ip.user_ns['onedim_folder'], (ip.user_ns['crd_prefix']+'_%d.txt') % head['FSN'])))
-        else:
-            data1d.append(
-                ex.radial_average(qrange, errorpropagation=3,
-                                  abscissa_errorpropagation=3))
-        data1d[-1].save(os.path.join(ip.user_ns['saveto_dir'],'curve_%05d.txt'%head['FSN']))
+            for l in ip.user_ns['_loaders']:
+                if l.processed != ~raw:
+                    continue
+                try:
+                    curve = l.loadcurve(head.fsn)
+                    break
+                except FileNotFoundError:
+                    continue
+            if curve is None:
+                print('Cannot load curve for FSN %d: reintegrating.' % head.fsn)
+        if curve is None:
+            # this happens if reintegrate==True or if reintegrate==False but the curve could not be loaded.
+            curve = ex.radial_average(qrange, errorpropagation=3,
+                                      abscissa_errorpropagation=3)
+        data1d.append(curve)
+
+        data1d[-1].save(os.path.join(ip.user_ns['saveto_dir'], 'curve_%05d.txt' % head.fsn))
         mat=np.zeros((len(data1d[-1]),3))
         mat[:,0]=data1d[-1].q
         mat[:,1]=data1d[-1].Intensity
         mat[:,2]=data1d[-1].Error
-        np.savetxt(os.path.join(ip.user_ns['saveto_dir'],'curve_%s_%05d.dat'%(head['Title'],head['FSN'])), mat)
+        np.savetxt(os.path.join(ip.user_ns['saveto_dir'], 'curve_%s_%05d.dat' % (head.title, head.fsn)), mat)
         del mat
         data2d=data2d+ex
         headersout.append(ex.header)
     data2d /= len(data1d)
+    # TODO itt folytatni.
+
     data2d['MeasTime'] = sum(
         [h['MeasTime'] for h in headersout])
     return data1d, data2d, headersout
