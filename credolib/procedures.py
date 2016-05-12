@@ -9,6 +9,7 @@ import numpy as np
 from IPython.core.getipython import get_ipython
 from IPython.display import display
 from mpl_toolkits.axes_grid import make_axes_locatable
+from sastool.classes2 import Curve
 from sastool.libconfig import qunit
 from sastool.misc.easylsq import nonlinear_odr, FixedParameter
 from sastool.misc.errorvalue import ErrorValue
@@ -18,7 +19,6 @@ from .calculation import correlmatrix
 from .io import get_different_distances
 from .plotting import plotsascurve
 from .utils import writemarkdown, print_abscissavalue, putlogo
-
 
 def _collect_data_for_summarization(headers,raw,reintegrate,qrange):
     ip=get_ipython()
@@ -33,9 +33,7 @@ def _collect_data_for_summarization(headers,raw,reintegrate,qrange):
         except KeyError:
             mo = None
         ex = None
-        for l in ip.user_ns['_loaders']:
-            if l.processed != ~raw:
-                continue
+        for l in [l_ for l_ in ip.user_ns['_loaders'] if l_.processed != raw]:
             try:
                 ex = l.loadexposure(head.fsn)
                 if mo is not None:
@@ -50,9 +48,7 @@ def _collect_data_for_summarization(headers,raw,reintegrate,qrange):
         ex.header = head
         curve = None
         if not reintegrate:
-            for l in ip.user_ns['_loaders']:
-                if l.processed != ~raw:
-                    continue
+            for l in [l_ for l_ in ip.user_ns['_loaders'] if l_.processed != raw]:
                 try:
                     curve = l.loadcurve(head.fsn)
                     break
@@ -76,10 +72,6 @@ def _collect_data_for_summarization(headers,raw,reintegrate,qrange):
         data2d=data2d+ex
         headersout.append(ex.header)
     data2d /= len(data1d)
-    # TODO itt folytatni.
-
-    data2d['MeasTime'] = sum(
-        [h['MeasTime'] for h in headersout])
     return data1d, data2d, headersout
 
 def _stabilityassessment(headers, data1d, dist, fig_correlmatrices, correlmatrixaxes, std_multiplier, correlmatrix_colormap,
@@ -95,7 +87,7 @@ def _stabilityassessment(headers, data1d, dist, fig_correlmatrices, correlmatrix
     img=correlmatrixaxes.imshow(cmatrix,interpolation='nearest',cmap=matplotlib.cm.get_cmap(correlmatrix_colormap))
     cax=make_axes_locatable(correlmatrixaxes).append_axes('right',size="5%",pad=0.1)
     fig_correlmatrices.colorbar(img,cax=cax)
-    fsns=[h['FSN'] for h in headers]
+    fsns = [h.fsn for h in headers]
 
     correlmatrixaxes.set_title('%.2f mm'%dist)
     correlmatrixaxes.set_xticks(list(range(len(data1d))))
@@ -112,12 +104,13 @@ def _stabilityassessment(headers, data1d, dist, fig_correlmatrices, correlmatrix
     matC,matp,matpadj,datcmp_ok=datcmp(*data1d)
     #datcmp_ok=[not x for x in badidx]
     for h,bad,discr,dcmp_ok in zip(headers, badidx,rowavg, datcmp_ok):
-        tab.append([h['FSN'],h['Date'].isoformat(),discr,(discr-rowavgmean)/rowavgstd,["\u2713","\u2718\u2718\u2718\u2718\u2718"][bad],
+        tab.append([h.fsn, h.date.isoformat(), discr, (discr - rowavgmean) / rowavgstd,
+                    ["\u2713", "\u2718\u2718\u2718\u2718\u2718"][bad],
                     ["\u2713","\u2718\u2718\u2718\u2718\u2718"][dcmp_ok!=1]])
         if bad:
-            badfsns.append(h['FSN'])
+            badfsns.append(h.fsn)
         if (not dcmp_ok and not np.isnan(dcmp_ok)):
-            badfsns_datcmp.append(h['FSN'])
+            badfsns_datcmp.append(h.fsn)
     tab=ipy_table.IpyTable(tab)
     tab.apply_theme('basic')
     return badfsns, badfsns_datcmp, tab
@@ -167,23 +160,22 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
     rowavg={}
     if raw:
         writemarkdown('# Summarizing RAW images.')
-        headers = ip.user_ns['_rawheaders']
+        headers = ip.user_ns['_headers']['raw']
         rawpart = '_raw' # this will be added in the filenames saved
     else:
         writemarkdown('# Summarizing CORRECTED images.')
-        headers = ip.user_ns['_evalheaders']
+        headers = ip.user_ns['_headers']['processed']
         rawpart = '' # nothing will be added in the filenames saved
     
     if samples is None:
         samples = sorted(ip.user_ns['allsamplenames'])
     for samplename in samples:
         writemarkdown('## '+samplename)
-        headers_sample=[h for h in headers if h['Title']==samplename]
+        headers_sample = [h for h in headers if h.title == samplename]
         data2d[samplename] = {}
         data1d[samplename] = {}
-        #rowavg[samplename] = {}
         headers_tosave[samplename] = {}
-        dists=get_different_distances([h for h in headers if h['Title']==samplename], dist_tolerance)
+        dists = get_different_distances([h for h in headers if h.title == samplename], dist_tolerance)
         if not dists:
             writemarkdown('No measurements from sample, skipping.')
             continue
@@ -198,7 +190,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
         onedimstdaxes=fig_curves.add_axes((0.1,0.1,0.8,0.2))
         for distidx, dist in enumerate(dists):
             writemarkdown("### Distance "+str(dist)+" mm")
-            headers_narrowed=[h for h in headers_sample if abs(h['DistCalibrated']-dist)<dist_tolerance]
+            headers_narrowed = [h for h in headers_sample if abs(float(h.distance) - dist) < dist_tolerance]
             distaxes[dist] = fig_2d.add_subplot(
                 nrows, ncols, distidx + 1)
             correlmatrixaxes[dist]=fig_correlmatrices.add_subplot(
@@ -237,9 +229,9 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
 
             # Plot the image
             try:
-                data2d[samplename][dist].plot2d(
-                   zscale='log10', axes=distaxes[dist], crosshair=False,
-                   cmap=matplotlib.cm.get_cmap(image_colormap))
+                data2d[samplename][dist].imshow(axes=distaxes[dist], show_crosshair=False,
+                                                norm=matplotlib.colors.LogNorm(),
+                                                cmap=matplotlib.cm.get_cmap(image_colormap))
             except ValueError:
                 print('Error plotting 2D image for sample %s, distance %.2f'%(samplename, dist))
             distaxes[dist].set_xlabel('q (' + qunit() + ')')
@@ -249,14 +241,13 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
                     ['', 's'][len(headers_tosave[samplename][dist]) > 1]))
 
             # Plot the curves
-            Istd=np.zeros((len(data1d[samplename][dist][0]),len(data1d[samplename][dist])),np.float)
+            Istd = np.stack([c.Intensity for c in data1d[samplename][dist]], axis=1)
             for i,c in enumerate(data1d[samplename][dist]):
                 c.loglog(axes=onedimaxes)
-                Istd[:,i]=c.Intensity
             if Istd.shape[1]>1:
                 onedimstdaxes.loglog(data1d[samplename][dist][0].q,Istd.std(axis=1)/Istd.mean(axis=1)*100,'b-')
             if not late_radavg:
-                data1d[samplename][dist] = SASCurve.average(
+                data1d[samplename][dist] = Curve.average(
                     *data1d[samplename][dist])
             else:
                 data1d[samplename][dist] = (
@@ -267,20 +258,20 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
             data1d[samplename][dist].loglog(
                 label='Average', lw=2, color='k', axes=onedimaxes)
 
-            #Saving image, headers, mask and curve
-            data2d[samplename][dist].write(
-                os.path.join(ip.user_ns['saveto_dir'],
-                             samplename + '_'+(
-                                 '%.2f' % dist).replace('.', '_') +
-                             rawpart + '.npz'), plugin='CREDO Reduced')
-            data2d[samplename][dist].header.write(
-                os.path.join(ip.user_ns['saveto_dir'],
-                             samplename + '_'+(
-                                 '%.2f' % dist).replace('.', '_') +
-                             rawpart +'.log'), plugin='CREDO Reduced')
-            data2d[samplename][dist].mask.write_to_mat(
-                os.path.join(ip.user_ns['saveto_dir'],
-                             data2d[samplename][dist].mask.maskid+'.mat'))
+            ##Saving image, headers, mask and curve
+            # data2d[samplename][dist].write(
+            #    os.path.join(ip.user_ns['saveto_dir'],
+            #                 samplename + '_'+(
+            #                     '%.2f' % dist).replace('.', '_') +
+            #                 rawpart + '.npz'), plugin='CREDO Reduced')
+            # data2d[samplename][dist].header.write(
+            #    os.path.join(ip.user_ns['saveto_dir'],
+            ###                 samplename + '_'+(
+            #                     '%.2f' % dist).replace('.', '_') +
+            #                 rawpart +'.log'), plugin='CREDO Reduced')
+            # data2d[samplename][dist].mask.write_to_mat(
+            #    os.path.join(ip.user_ns['saveto_dir'],
+            #                 data2d[samplename][dist].mask.maskid+'.mat'))
             data1d[samplename][dist].save(os.path.join(ip.user_ns['saveto_dir'], samplename + '_'+('%.2f' % dist).replace('.', '_') + rawpart + '.txt'))
 
 
@@ -288,24 +279,19 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
             q_ = data1d[samplename][dist].q
             qmin = q_[q_ > 0].min()
             writemarkdown('#### Q-range & flux')
-            writemarkdown('- $q_{min}$: '+ print_abscissavalue(qmin, data2d[samplename][dist]['Wavelength'], dist))
-            writemarkdown('- $q_{max}$: '+ print_abscissavalue(data1d[samplename][dist].q.max(), data2d[samplename][dist]['Wavelength'], dist))
-            writemarkdown('- Number of $q$ points: '+str(len(data1d[samplename][dist])))
+            writemarkdown(
+                '- $q_{min}$: ' + print_abscissavalue(qmin, headers_tosave[samplename][dist][0].wavelength, dist))
+            writemarkdown('- $q_{max}$: ' + print_abscissavalue(data1d[samplename][dist].q.max(),
+                                                                headers_tosave[samplename][dist][0].wavelength, dist))
+            writemarkdown('- Number of $q$ points: ' + str(len(data1d[samplename][dist])))
+            meastime = sum([h.exposuretime for h in headers_tosave[samplename][dist]])
+            writemarkdown("- from %d exposures, total exposure time %.0f sec <=> %.2f hr" % (
+                len(headers_tosave[samplename][dist]),
+                meastime, meastime / 3600.))
             try:
-                normfac = [h['NormFactor']
-                           for h in headers_tosave[samplename][dist]]
-                cct_type_headers=['devices.pilatus.exptime' in h for h in headers_tosave[samplename][dist]]
-                if not any (cct_type_headers):
-                    flux=(1 / ErrorValue(np.mean(normfac), np.std(normfac))/
-                          headers_tosave[samplename][dist][0]['XPixel']/
-                          headers_tosave[samplename][dist][0]['YPixel']/
-                          0.96).tostring()
-                elif all(cct_type_headers):
-                    flux=(1/ErrorValue(np.mean(normfac),np.std(normfac))/0.96).tostring()
-                else:
-                    flux='Mixed SAXSCtrl and CCT headers, cannot estimate normfactor correctly.'
+                flux = [h.flux for h in headers_tosave[samplename][dist]]
+                flux = ErrorValue(np.mean(flux), np.std(flux))
                 writemarkdown("- beam flux (photon/sec): %s"%flux)
-                writemarkdown("- from %d exposures, total exposure time %.0f sec <=> %.2f hr" % (len(headers_tosave[samplename][dist]), data2d[samplename][dist]['MeasTime'], data2d[samplename][dist]['MeasTime']/3600.))
             except KeyError:
                 writemarkdown("- *No information on beam flux: dealing with raw data.*")
         onedimaxes.set_xlabel('')
@@ -318,12 +304,12 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
         onedimstdaxes.set_ylabel('Rel.std.dev. of intensity (%)')
         onedimstdaxes.grid(True, which='both')
         onedimstdaxes.set_xlim(*onedimaxes.get_xlim())
+        onedimstdaxes.set_xscale(onedimaxes.get_xscale())
         putlogo(fig_curves)
         putlogo(fig_2d)
         fig_2d.tight_layout()
         fig_correlmatrices.suptitle(samplename)
         fig_correlmatrices.tight_layout()
-        #fig_curves.tight_layout()
         fig_2d.savefig(
             os.path.join(ip.user_ns['auximages_dir'],
                          'averaging2D_' +
@@ -348,7 +334,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
     writemarkdown('['+', '.join(str(f) for f in ip.user_ns['badfsns_datcmp'])+']')
     ip.user_ns['_data1d'] = data1d
     ip.user_ns['_data2d'] = data2d
-    ip.user_ns['_headers_tosave'] = headers_tosave
+    ip.user_ns['_headers_sample'] = headers_tosave
     ip.user_ns['_rowavg']=rowavg
 
 def _merge_two_curves(curve1, curve2, qmin, qmax, qsep, use_additive_constant=False):
@@ -379,8 +365,8 @@ def _merge_two_curves(curve1, curve2, qmin, qmax, qsep, use_additive_constant=Fa
         bg_init=0
     else:
         bg_init=FixedParameter(0)
-    factor, bg, stat=nonlinear_odr(curve2_interp.y, curve1_interp.y, curve2_interp.dy, curve1_interp.dy, lambda x,factor, bg:x*factor+bg,[1,bg_init])
-    return SASCurve.merge(curve1-bg, factor*curve2, qsep), factor, bg, stat
+    factor, bg, stat=nonlinear_odr(curve2_interp.y, curve1_interp.y, curve2_interp.dy, curve1_interp.dy, lambda x,factor, bg:x*factor+bg, [1, bg_init])
+    return Curve.merge(curve1 - bg, factor * curve2, qsep), factor, bg, stat
 
 def _scale_two_exposures(exp1,exp2,qmin,qmax,N=10,use_additive_constant=False):
     qrange=np.linspace(qmin,qmax,N)
@@ -473,8 +459,10 @@ def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_s
     plt.savefig(
         os.path.join(ip.user_ns['auximages_dir'], 'uniting_' + samplename + '.'+ graph_extension), dpi=graph_dpi)
     print("    United curve spans the following ranges:")
-    print("        q_min: ", print_abscissavalue(united.q.min(), ip.user_ns['_data2d'][samplename][dists[0]]['Wavelength']))
-    print("        q_max: ", print_abscissavalue(united.q.max(), ip.user_ns['_data2d'][samplename][dists[0]]['Wavelength']))
+    print("        q_min: ",
+          print_abscissavalue(united.q.min(), ip.user_ns['_headers_sample'][samplename][dists[0]][0].wavelength))
+    print("        q_max: ",
+          print_abscissavalue(united.q.max(), ip.user_ns['_headers_sample'][samplename][dists[0]][0].wavelength))
     print("        q_max/q_min:", united.q.max() / united.q.min())
     print("        I_min: ", united.Intensity.min(), "cm^{-1}")
     print("        I_max: ", united.Intensity.max(), "cm^{-1}")

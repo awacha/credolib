@@ -70,7 +70,7 @@ def getdists(samplename):
     return sorted([d for d in ip.user_ns['_headers_sample'][samplename]])
 
 def get_different_distances(headers, tolerance=2):
-    alldists = {h.distance for h in headers}
+    alldists = {float(h.distance) for h in headers}
     dists = []
     for d in alldists:
         if [d_ for d_ in dists if abs(d - d_) < tolerance]:

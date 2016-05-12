@@ -9,7 +9,6 @@ from IPython.display import display
 from matplotlib.colors import LogNorm
 from sastool.classes import SASHeader, SASMask
 from sastool.misc.easylsq import nonlinear_leastsquares
-from sastool.misc.errorvalue import ErrorValue
 
 
 def assess_flux_stability(samplename='Glassy_Carbon'):
@@ -21,40 +20,36 @@ def assess_flux_stability(samplename='Glassy_Carbon'):
     ax2=plt.twinx()
     plt.ylabel('Vacuum pressure (mbar), dotted lines')
     plt.title('Beam flux stability')
-    lines=[]
-    samplenames=sorted([sn_ for sn_ in ip.user_ns['_headers_tosave'] if samplename in sn_])
+    samplenames = sorted([sn_ for sn_ in ip.user_ns['_headers_sample'] if samplename in sn_])
     linestyles=['b','g','r','c','m','y','k']
     lines=[]
     for sn,ls in zip(samplenames,linestyles):
         print(sn)
-        heds=ip.user_ns['_headers_tosave'][sn]
+        heds = ip.user_ns['_headers_sample'][sn]
         allheds=[]
         for k in heds.keys():
             allheds.extend(heds[k])
-        allheds=sorted(allheds,key=lambda x:x['FSN'])
-        fsns=np.array([h['FSN'] for h in allheds])
-        cctstyleheaders=['devices.pilatus.exptime' in h for h in allheds]
-        divisor=[[h['XPixel']*h['YPixel'],1]['devices.pilatus.exptime' in h] for h in allheds]
-        factors=np.array([1/h['NormFactor']/d/0.96 for h,d in zip(allheds,divisor)])
-
-        dates=[h['Date'] for h in allheds]
-        lines.extend(ax1.plot(dates,factors,ls+'o',label='Flux (%s)'%sn))
-        vacuums=np.array([h['Vacuum'] for h in allheds])
+        allheds = sorted(allheds, key=lambda x: x.fsn)
+        flux = np.array([float(h.flux) for h in allheds])
+        dates = [h.date for h in allheds]
+        lines.extend(ax1.plot(dates, flux, ls + 'o', label='Flux (%s)' % sn))
+        vacuums = np.array([float(h.vacuum) for h in allheds])
         lines.extend(ax2.plot(dates,vacuums,ls+'s',label='Vacuum (%s)'%sn,lw=2))
         print('  Measurement duration: %.2f h'%((dates[-1]-dates[0]).total_seconds()/3600.))
-        print('  Mean flux: ',factors.mean(),'+/-',factors.std(),'photons/sec')
-        print('  RMS variation of flux: ',factors.std()/factors.mean()*100,'%')
-        print('  P-P variation of flux: ',(factors.max()-factors.min())/factors.mean()*100,'%')
+        print('  Mean flux: ', flux.mean(), '+/-', flux.std(), 'photons/sec')
+        print('  RMS variation of flux: ', flux.std() / flux.mean() * 100, '%')
+        print('  P-P variation of flux: ', flux.ptp() / flux.mean() * 100, '%')
     ax1.legend(lines,[l.get_label() for l in lines],loc='best')
     plt.show()
 
 def sum_measurement_times():
     ip=get_ipython()
-    _headers_tosave=ip.user_ns['_headers_tosave']
+    headers = ip.user_ns['_headers_sample']
     tab=[['Sample name','Distance (mm)','Measurement time (h)']]
-    for samplename in sorted(_headers_tosave):
-        for dist in _headers_tosave[samplename]:
-            tab.append([samplename, "%.f"%dist, sum([h['MeasTime'] for h in _headers_tosave[samplename][dist]])/3600])
+    for samplename in sorted(headers):
+        for dist in sorted(headers[samplename]):
+            tab.append([samplename, "%.2f" % dist,
+                        '%.2f' % (sum([h.exposuretime for h in headers[samplename][dist]]) / 3600)])
     tab=ipy_table.IpyTable(tab)
     tab.apply_theme('basic')
     display(tab)
@@ -117,14 +112,14 @@ def assess_instrumental_background(Wx=20, Wy=20, emptyname='Empty_Beam', masknam
 def assess_transmission():
     ip = get_ipython()
     tab=[['Sample name','Distance','Transmission','Linear absorption coefficient (1/cm)','Absorption length (cm)']]
-    for sample in sorted(ip.user_ns['_headers_tosave']):
-        for dist in sorted(ip.user_ns['_headers_tosave'][sample]):
+    for sample in sorted(ip.user_ns['_headers_sample']):
+        for dist in sorted(ip.user_ns['_headers_sample'][sample]):
             transms_seen=[]
-            for h in ip.user_ns['_headers_tosave'][sample][dist]:
-                if h['Transm'] not in transms_seen:
-                    transms_seen.append(h['Transm'])
-                    transm=ErrorValue(h['Transm'],h['TransmError'])
-                    thickness=ErrorValue(h['Thickness'],h['ThicknessError'])
+            for h in ip.user_ns['_headers_sample'][sample][dist]:
+                if float(h.transmission) not in transms_seen:
+                    transms_seen.append(float(h.transmission))
+                    transm = h.transmission
+                    thickness = h.thickness
                     try:
                         mu=(-transm.log())/thickness
                     except ZeroDivisionError:
@@ -135,7 +130,8 @@ def assess_transmission():
                             invmu=(1/mu).tostring(extra_digits=2)
                         except ZeroDivisionError:
                             invmu='Infinite'
-                    tab.append([sample,dist,transm.tostring(extra_digits=2),mu.tostring(extra_digits=2),invmu])
+                        mu = mu.tostring(extra_digits=2)
+                    tab.append([sample, dist, transm.tostring(extra_digits=2), mu, invmu])
     tab=ipy_table.IpyTable(tab)
     tab.apply_theme('basic')
     display(tab)
