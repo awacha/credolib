@@ -1,27 +1,44 @@
 __all__=['guinieranalysis']
 
-from .io import getsascurve
-from .atsas import autorg, datgnom, shanum
-from .utils import writemarkdown
-import matplotlib.pyplot as plt
-import numpy as np
-from IPython.display import display
-from IPython.core.getipython import get_ipython
-import ipy_table
 import os
 
+import ipy_table
+import matplotlib.pyplot as plt
+import numpy as np
+from IPython.core.getipython import get_ipython
+from IPython.display import display
+
+from .atsas import autorg, datgnom, shanum
+from .io import getsascurve
+from .utils import writemarkdown
+
+
 def guinieranalysis(samplenames, qranges=None,qmax_from_shanum=True, prfunctions_postfix='', dist=None, plotguinier=True, graph_extension='.png'):
+    """Perform Guinier analysis on the samples.
+
+    Inputs:
+        samplenames: list of sample names
+        qranges: dictionary of q ranges for each sample. The keys are sample names. The special '__default__' key
+            corresponds to all samples which do not have a key in the dict.
+        qmax_from_shanum: use the qmax determined by the shanum program for the GNOM input.
+        prfunctions_postfix: The figure showing the P(r) functions will be saved as
+            prfunctions_<prfunctions_postfix><graph_extension>
+        dist: the sample-to-detector distance to use.
+        plotguinier: if Guinier plots are needed.
+        graph_extension: the extension of the saved graph image files."""
     figpr=plt.figure()
     ip=get_ipython()
     axpr=figpr.add_subplot(1,1,1)
     if qranges is None:
-        qranges={}
+        qranges = {'__default__': (0, 1000000)}
+    if '__default__' not in qranges:
+        qranges['__default__'] = (0, 1000000)
     table_autorg=[['Name', 'Rg (nm)', 'I$_0$ (cm$^{-1}$ sr$^{-1}$)', 'q$_{min}$ (nm$^{-1}$)', 'q$_{max}$ (nm$^{-1}$)', 'quality', 'aggregation', 'Dmax (nm)', 'q$_{shanum}$ (nm$^{-1}$)']]
     table_gnom=[['Name', 'Rg (nm)', 'I$_0$ (cm$^{-1}$ sr$^{-1}$)', 'qmin (nm$^{-1}$)', 'qmax (nm$^{-1}$)', 'Dmin (nm)', 'Dmax (nm)']]
     results={}
     for sn in samplenames:
         if sn not in qranges:
-            qrange=(0,1000000)
+            qrange = qranges['__default__']
         else:
             qrange=qranges[sn]
         curve=getsascurve(sn,dist)[0].trim(*qrange)
