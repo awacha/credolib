@@ -18,11 +18,14 @@ def load_headers(fsns):
                     break
                 except FileNotFoundError:
                     continue
-        print("%d headers (%s) out of %d have been loaded successfully." % (len(headers), type_, len(fsns)))
-        print('Read FSN range:', min([h.fsn for h in headers]), 'to', max([h.fsn for h in headers]))
         allsamplenames = {h.title for h in headers}
-        print("Samples covered by these headers:")
-        print("    " + "\n    ".join(sorted(allsamplenames)),flush=True)
+        if not headers:
+            print('NO HEADERS READ FOR TYPE "%s"' % type_)
+        else:
+            print("%d headers (%s) out of %d have been loaded successfully." % (len(headers), type_, len(fsns)))
+            print('Read FSN range:', min([h.fsn for h in headers]), 'to', max([h.fsn for h in headers]))
+            print("Samples covered by these headers:")
+            print("    " + "\n    ".join(sorted(allsamplenames)), flush=True)
         if processed:
             ip.user_ns['allsamplenames'] = allsamplenames
         ip.user_ns['_headers'][type_] = headers
