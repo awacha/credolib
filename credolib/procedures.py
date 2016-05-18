@@ -37,13 +37,17 @@ def _collect_data_for_summarization(headers,raw,reintegrate,qrange):
             try:
                 ex = l.loadexposure(head.fsn)
                 if mo is not None:
-                    ex.mask = l.loadmask(mo)
+                    try:
+                        ex.mask = l.loadmask(mo)
+                    except FileNotFoundError:
+                        raise FileNotFoundError('Could not load mask: %s' % mo)
                 break
             except FileNotFoundError:
                 continue
         if ex is None:
             print('Could not load %s 2D file: for FSN %d' % (['processed', 'raw'][raw], head.fsn))
-            ip.user_ns['badfsns'].append(head.fsn)
+            ip.user_ns['badfsns'] = set(ip.user_ns['badfsns'])
+            ip.user_ns['badfsns'].add(head.fsn
             continue
         ex.header = head
         curve = None
