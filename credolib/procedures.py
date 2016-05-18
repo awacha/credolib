@@ -47,7 +47,7 @@ def _collect_data_for_summarization(headers,raw,reintegrate,qrange):
         if ex is None:
             print('Could not load %s 2D file: for FSN %d' % (['processed', 'raw'][raw], head.fsn))
             ip.user_ns['badfsns'] = set(ip.user_ns['badfsns'])
-            ip.user_ns['badfsns'].add(head.fsn
+            ip.user_ns['badfsns'].add(head.fsn)
             continue
         ex.header = head
         curve = None
