@@ -1,7 +1,9 @@
-__all__=['read_gnom_pr','execute_command','autorg', 'shanum','datgnom','dammif','bodies','datcmp']
+__all__ = ['read_gnom_pr', 'execute_command', 'autorg', 'shanum', 'datgnom', 'dammif', 'bodies', 'datcmp', 'datporod',
+           'gnom']
 import itertools
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 
@@ -32,6 +34,15 @@ def read_gnom_pr(filename, get_metadata=False):
              parameters['STABIL'][what], parameters['SYSDEV'][what],
              parameters['POSITV'][what], parameters['VALCEN'][what]) = tuple([
                 float(x) for x in line[1:]])
+        te = tw = 0
+        for p in parameters:
+            par = parameters[p]
+            par['Estimate_corrected'] = np.exp(-(par['Ideal'] - par['Current']) ** 2 / par['Sigma'] ** 2)
+            te += par['Estimate_corrected'] * par['Weight']
+            tw += par['Weight']
+        metadata['totalestimate_corrected'] = te / tw
+
+        metadata['parameters'] = parameters
         assert(not f.readline().strip()) # skip empty line
         match=re.match(r'Angular\s+range\s+:\s+from\s+(?P<qmin>\d+\.\d+)\s+to\s+(?P<qmax>\d+\.\d+)', f.readline().strip())
         assert(match is not None)
@@ -333,6 +344,21 @@ def bodies(filename, bodytypes=None, prefix=None, fit_timeout=10,Ndummyatoms=200
     return fittingresults
 
 def datcmp(*curves, alpha=None, adjust=None,test='CORMAP'):
+    """Run datcmp on the scattering curves.
+
+    Inputs:
+        *curves: scattering curves as positional arguments
+        alpha: confidence parameter
+        adjust: adjustment type (string), see the help of datcmp for details
+        test: test (string), see the help of datcmp for details
+
+    Outputs:
+        matC: the C matrix
+        matp: the matrix of the p values comparing the i-th and j-th exposure
+        matpadj: adjusted p-matrix of the exposures
+        ok: list of the same length as the number of curves. If True, the
+            given curve does not differ significantly from the others.
+    """
     if len({len(c) for c in curves}) != 1:
         raise ValueError('All curves have to be of the same length.')
     datcmpargs=[]
@@ -371,3 +397,51 @@ def datcmp(*curves, alpha=None, adjust=None,test='CORMAP'):
                     if m is not None:
                         ok[int(m.group('i'))-1]=(m.group('ack')=='*')
     return matC, matp, matpadj, ok
+
+
+def datporod(gnomoutfile):
+    """Run datporod and return the estimated Porod volume.
+
+    Returns:
+         Radius of gyration found in the input file
+         I0 found in the input file
+         Vporod: the estimated Porod volume
+    """
+    results = subprocess.check_output(['datporod', gnomoutfile]).decode('utf-8').strip().split()
+    return float(results[0]), float(results[1]), float(results[2])
+
+
+def gnom(curve, Rmax, outputfilename=None, Npoints_realspace=None, initial_alpha=None):
+    """Run GNOM on the dataset.
+
+    Inputs:
+        curve: an instance of sastool.classes2.Curve or anything which has a
+            save() method, saving the scattering curve to a given .dat file,
+            in q=4*pi*sin(theta)/lambda [1/nm] units
+        Rmax: the estimated maximum extent of the scattering object, in nm.
+        outputfilename: the preferred name of the output file. If not given,
+            the .out file produced by gnom will be lost.
+        Npoints_realspace: the expected number of points in the real space
+        initial_alpha: the initial value of the regularization parameter.
+
+    Outputs:
+        the same as of read_gnom_pr()
+    """
+    with tempfile.TemporaryDirectory(prefix='credolib_gnom') as td:
+        curve.save(os.path.join(td, 'curve.dat'))
+        if Npoints_realspace is None:
+            Npoints_realspace = ""
+        else:
+            Npoints_realspace = str(Npoints_realspace)
+        if initial_alpha is None:
+            initial_alpha = ""
+        else:
+            initial_alpha = str(initial_alpha)
+        gnominput = "\n%s\n%s\n0\n\n0\n2\nN\n\nN\n0\nY\nY\n%f\n%s\n\n0\n%s\nN\nN\n\nY\nN\nN\n" % (
+            os.path.join(td, 'curve.dat'), os.path.join(td, 'gnom.out'), Rmax * 10, Npoints_realspace, initial_alpha)
+        result = subprocess.run(['gnom'], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                input=gnominput.encode('utf-8'))
+        gpr = read_gnom_pr(os.path.join(td, 'gnom.out'), True)
+        if outputfilename is not None:
+            shutil.copy(os.path.join(td, 'gnom.out'), outputfilename)
+    return gpr
