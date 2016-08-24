@@ -68,7 +68,7 @@ def _collect_data_for_summarization(headers, raw, reintegrate, qrange):
         if curve is None:
             # this happens if reintegrate==True or if reintegrate==False but the curve could not be loaded.
             curve = ex.radial_average(qrange, errorpropagation=3,
-                                      abscissa_errorpropagation=3)
+                                      abscissa_errorpropagation=3, raw_result=False)
         data1d.append(curve)
 
         data1d[-1].save(os.path.join(ip.user_ns['saveto_dir'], 'curve_%05d.txt' % head.fsn))
@@ -273,7 +273,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
                     data2d[samplename][dist].radial_average(
                             qrange,
                             errorpropagation=3,
-                            abscissa_errorpropagation=3))
+                            abscissa_errorpropagation=3, raw_result=False))
             data1d[samplename][dist].loglog(
                     label='Average', lw=2, color='k', axes=onedimaxes)
 
@@ -394,8 +394,8 @@ def _merge_two_curves(curve1: Curve, curve2: Curve, qmin, qmax, qsep, use_additi
 
 def _scale_two_exposures(exp1, exp2, qmin, qmax, N=10, use_additive_constant=False):
     qrange = np.linspace(qmin, qmax, N)
-    rad1 = exp1.radial_average(qrange=qrange)
-    rad2 = exp2.radial_average(qrange=qrange)
+    rad1 = exp1.radial_average(qrange=qrange, raw_result=False)
+    rad2 = exp2.radial_average(qrange=qrange, raw_result=False)
     if use_additive_constant:
         bg_init = 0
     else:

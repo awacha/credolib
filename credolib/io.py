@@ -1,6 +1,21 @@
-__all__=['load_headers','getsascurve','getsasexposure','getheaders', 'getdists']
+__all__ = ['load_headers', 'getsascurve', 'getsasexposure', 'getheaders', 'getdists', 'filter_headers']
 from IPython.core.getipython import get_ipython
 
+
+def filter_headers(criterion):
+    """Filter already loaded headers against some criterion.
+
+    The criterion function must accept a single argument, which is an instance
+    of sastool.classes2.header.Header, or one of its subclasses. The function
+    must return True if the header is to be kept or False if it needs to be
+    discarded. All manipulations on the header (including sample name changes,
+    etc.) carried out by this function are preserved.
+    """
+    ip = get_ipython()
+    for headerkind in ['processed', 'raw']:
+        for h in ip.user_ns['_headers'][headerkind][:]:
+            if not criterion(h):
+                ip.user_ns['_headers'][headerkind].remove(h)
 
 def load_headers(fsns):
     """Load header files
