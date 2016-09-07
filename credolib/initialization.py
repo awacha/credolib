@@ -53,10 +53,10 @@ def init_dirs(rootdir_or_loader, outputpath, saveto_dir='data',
     if isinstance(rootdir_or_loader, str):
         print("Initializing loaders for SAXSCtrl and CCT.", flush=True)
         ip.user_ns['_loaders'] = [
-            credo_cct.Loader(rootdir_or_loader, prefix, processed=True),
-            credo_saxsctrl.Loader(rootdir_or_loader, prefix, processed=True),
-            credo_cct.Loader(rootdir_or_loader, prefix, processed=False),
-            credo_saxsctrl.Loader(rootdir_or_loader, prefix, processed=False),
+            credo_cct.Loader(rootdir_or_loader, processed=True, exposureclass=prefix),
+            credo_saxsctrl.Loader(rootdir_or_loader, processed=True, exposureclass=prefix),
+            credo_cct.Loader(rootdir_or_loader, processed=False, exposureclass=prefix),
+            credo_saxsctrl.Loader(rootdir_or_loader, processed=False, exposureclass=prefix),
         ]
         print("Loaders initialized.", flush=True)
     elif isinstance(rootdir_or_loader, Loader):
