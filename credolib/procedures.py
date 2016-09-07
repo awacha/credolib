@@ -13,6 +13,7 @@ from IPython.core.getipython import get_ipython
 from IPython.display import display
 from mpl_toolkits.axes_grid import make_axes_locatable
 from sastool.classes2 import Curve
+from sastool.classes2 import Exposure
 from sastool.libconfig import qunit
 from sastool.misc.easylsq import nonlinear_odr, FixedParameter
 from sastool.misc.errorvalue import ErrorValue
@@ -40,6 +41,7 @@ def _collect_data_for_summarization(headers, raw, reintegrate, qrange):
         for l in [l_ for l_ in ip.user_ns['_loaders'] if l_.processed != raw]:
             try:
                 ex = l.loadexposure(head.fsn)
+                assert isinstance(ex, Exposure)
                 if mo is not None:
                     try:
                         ex.mask = l.loadmask(mo)
@@ -69,6 +71,7 @@ def _collect_data_for_summarization(headers, raw, reintegrate, qrange):
             # this happens if reintegrate==True or if reintegrate==False but the curve could not be loaded.
             curve = ex.radial_average(qrange, errorpropagation=3,
                                       abscissa_errorpropagation=3, raw_result=False)
+        curve = curve[curve.q > 0]
         data1d.append(curve)
 
         data1d[-1].save(os.path.join(ip.user_ns['saveto_dir'], 'curve_%05d.txt' % head.fsn))
@@ -124,7 +127,7 @@ def _stabilityassessment(headers, data1d, dist, fig_correlmatrices, correlmatrix
             badfsns_datcmp.append(h.fsn)
     tab = ipy_table.IpyTable(tab)
     tab.apply_theme('basic')
-    return badfsns, badfsns_datcmp, tab
+    return badfsns, badfsns_datcmp, tab, rowavg
 
 
 def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
@@ -186,6 +189,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
         writemarkdown('## ' + samplename)
         headers_sample = [h for h in headers if h.title == samplename]
         data2d[samplename] = {}
+        rowavg[samplename] = {}
         data1d[samplename] = {}
         headers_tosave[samplename] = {}
         dists = get_different_distances([h for h in headers if h.title == samplename], dist_tolerance)
@@ -223,7 +227,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
             (data1d[samplename][dist], data2d[samplename][dist], headers_tosave[samplename][dist]) = \
                 _collect_data_for_summarization(headers_narrowed, raw, reintegrate, qrange)
 
-            badfsns, badfsns_datcmp, tab = _stabilityassessment(
+            badfsns, badfsns_datcmp, tab, rowavg[samplename][dist] = _stabilityassessment(
                     headers_tosave[samplename][dist],
                     data1d[samplename][dist], dist,
                     fig_correlmatrices,
@@ -233,6 +237,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
                         ('%.2f' % dist).replace('.', '_')) +
                                  rawpart + '.npz'),
                     logarithmic_correlmatrix=correlmatrix_logarithmic)
+
             if 'badfsns' not in ip.user_ns:
                 ip.user_ns['badfsns'] = {}
             elif 'badfsns_datcmp' not in ip.user_ns:
