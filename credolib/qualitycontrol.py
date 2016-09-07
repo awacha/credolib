@@ -1,4 +1,5 @@
-__all__=['assess_flux_stability','sum_measurement_times','assess_sample_stability','assess_instrumental_background','assess_transmission']
+__all__ = ['assess_flux_stability', 'sum_measurement_times', 'assess_sample_stability',
+           'assess_instrumental_background', 'assess_transmission', 'assess_gc_fit']
 import os
 
 import ipy_table
@@ -8,6 +9,7 @@ from IPython.core.getipython import get_ipython
 from IPython.display import display
 from matplotlib.colors import LogNorm
 from sastool.classes import SASHeader, SASMask
+from sastool.classes2 import Curve
 from sastool.misc.easylsq import nonlinear_leastsquares
 
 
@@ -135,3 +137,35 @@ def assess_transmission():
     tab=ipy_table.IpyTable(tab)
     tab.apply_theme('basic')
     display(tab)
+
+
+def assess_gc_fit(reffile=None, gcname='Glassy_Carbon'):
+    ip = get_ipython()
+    if reffile is None:
+        reffile = ip.user_ns['_loaders'][0].get_subpath('config/GC_data_nm.dat')
+    refcurve = Curve.new_from_file(reffile)
+    f = plt.figure()
+    f.add_subplot(1, 1, 1)
+    rads = {}
+    for fsn in sorted([h.fsn for h in ip.user_ns['_headers']['processed'] if h.title == gcname]):
+        ex = None
+        for l in ip.user_ns['_loaders']:
+            try:
+                ex = l.loadexposure(fsn)
+            except FileNotFoundError:
+                continue
+        if ex is None:
+            continue
+        rads[ex.header.fsn] = ex.radial_average(refcurve.q)
+        del ex
+    qmin = max([r.sanitize().q.min() for r in rads.values()])
+    qmax = min([r.sanitize().q.max() for r in rads.values()])
+    refcurve.trim(qmin, qmax).loglog('o', mfc='none', ms=10)
+    for r in sorted(rads):
+        rads[r].loglog('.', label='#{:d}'.format(r))
+    plt.axis('tight')
+    plt.legend(loc='best', numpoints=1)
+    plt.xlabel('q (nm$^{-1}$)')
+    plt.ylabel('$d\Sigma/d\Omega$ (cm$^{-1}$ sr$^{-1}$)')
+    plt.grid(True, which='both')
+    plt.draw()
