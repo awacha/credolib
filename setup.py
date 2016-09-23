@@ -12,12 +12,14 @@ def getresourcefiles():
     return reslist
 
 
-setup(name='credolib', version='2.0.0', author='Andras Wacha',
+setup(name='credolib', author='Andras Wacha',
       author_email='awacha@gmail.com', url='http://github.com/awacha/credolib',
       description='CREDO Data processing library',
       packages=find_packages(),
-      install_requires=['numpy>=1.0.0', 'scipy>=0.7.0', 'matplotlib', 'sastool', 'IPython', 'ipy_table','cython'],
+      install_requires=['numpy>=1.0.0', 'scipy>=0.7.0', 'matplotlib', 'sastool', 'IPython', 'ipy_table','cython', 'ipywidgets'],
       keywords="saxs sans sas small-angle scattering x-ray instrument control",
+      setup_requires=['setuptools_scm'],
+      use_scm_version=True,
       license="",
       package_data={'': getresourcefiles()},
       zip_safe=False,
