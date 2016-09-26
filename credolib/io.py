@@ -16,6 +16,7 @@ def filter_headers(criterion):
         for h in ip.user_ns['_headers'][headerkind][:]:
             if not criterion(h):
                 ip.user_ns['_headers'][headerkind].remove(h)
+    ip.user_ns['allsamplenames'] = {h.title for h in ip.user_ns['_headers']['processed']}
 
 def load_headers(fsns):
     """Load header files
