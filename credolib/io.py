@@ -1,6 +1,10 @@
 __all__ = ['load_headers', 'getsascurve', 'getsasexposure', 'getheaders', 'getdists', 'filter_headers']
 from IPython.core.getipython import get_ipython
-
+from sastool.classes2.loader import Loader
+from sastool.classes2.curve import Curve
+from sastool.classes2.header import Header
+from sastool.classes2.exposure import Exposure
+from typing import List, Tuple, Union
 
 def filter_headers(criterion):
     """Filter already loaded headers against some criterion.
@@ -18,7 +22,7 @@ def filter_headers(criterion):
                 ip.user_ns['_headers'][headerkind].remove(h)
     ip.user_ns['allsamplenames'] = {h.title for h in ip.user_ns['_headers']['processed']}
 
-def load_headers(fsns):
+def load_headers(fsns:List[int]):
     """Load header files
     """
     ip = get_ipython()
@@ -46,7 +50,7 @@ def load_headers(fsns):
             ip.user_ns['allsamplenames'] = allsamplenames
         ip.user_ns['_headers'][type_] = headers
 
-def getsascurve(samplename, dist=None):
+def getsascurve(samplename:str, dist=None) -> Tuple[Curve, Union[float, str]]:
     ip = get_ipython()
     if dist == 'united':
         data1d = ip.user_ns['_data1dunited'][samplename]
@@ -64,7 +68,7 @@ def getsascurve(samplename, dist=None):
         data1d = data1d[dist]
     return data1d, dist
 
-def getsasexposure(samplename, dist=None):
+def getsasexposure(samplename, dist=None) -> Tuple[Curve, float]:
     ip = get_ipython()
     if dist is None:
         data2d = ip.user_ns['_data2d'][samplename]
@@ -77,18 +81,18 @@ def getsasexposure(samplename, dist=None):
     return data2d, dist
 
 
-def getheaders(processed=True):
+def getheaders(processed=True) -> List[Header]:
     ip = get_ipython()
     if processed:
         return ip.user_ns['_headers']['processed']
     else:
         return ip.user_ns['_headers']['raw']
 
-def getdists(samplename):
+def getdists(samplename) -> List[float]:
     ip = get_ipython()
     return sorted([d for d in ip.user_ns['_headers_sample'][samplename]])
 
-def get_different_distances(headers, tolerance=2):
+def get_different_distances(headers, tolerance=2) -> List[float]:
     alldists = {float(h.distance) for h in headers}
     dists = []
     for d in alldists:
@@ -96,3 +100,17 @@ def get_different_distances(headers, tolerance=2):
             continue
         dists.append(d)
     return sorted(dists)
+
+def load_exposure(fsn:int, raw=True, processed=True) -> Exposure:
+    ip = get_ipython()
+    for l in ip.user_ns['_loaders']:
+        assert isinstance(l, Loader)
+        if l.processed and not processed:
+            continue
+        if not l.processed and not raw:
+            continue
+        try:
+            return l.loadexposure(fsn)
+        except (OSError, ValueError):
+            continue
+    raise FileNotFoundError('Cannot find exposure for fsn #{:d}'.format(fsn))

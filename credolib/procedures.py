@@ -2,6 +2,8 @@ __all__ = ['summarize', 'unite', 'subtract_bg']
 
 import numbers
 import os
+import traceback
+import sys
 
 import ipy_table
 import matplotlib
@@ -20,7 +22,7 @@ from sastool.misc.errorvalue import ErrorValue
 
 from .atsas import datcmp
 from .calculation import correlmatrix
-from .io import get_different_distances
+from .io import get_different_distances, load_exposure
 from .plotting import plotsascurve
 from .utils import writemarkdown, print_abscissavalue, putlogo
 
@@ -38,21 +40,20 @@ def _collect_data_for_summarization(headers, raw, reintegrate, qrange):
         except KeyError:
             mo = None
         ex = None
-        for l in [l_ for l_ in ip.user_ns['_loaders'] if l_.processed != raw]:
-            try:
-                ex = l.loadexposure(head.fsn)
-                assert isinstance(ex, Exposure)
-                if mo is not None:
-                    try:
-                        ex.mask = l.loadmask(mo)
-                    except FileNotFoundError:
-                        print('Could not load mask: %s' % mo)
-                        raise FileNotFoundError('Could not load mask: %s' % mo)
-                break
-            except FileNotFoundError:
-                continue
+        last_exception = None
+        try:
+            ex = load_exposure(head.fsn, raw=raw, processed=not raw)
+            assert isinstance(ex, Exposure)
+            if mo is not None:
+                try:
+                    ex.mask = ex.loader.loadmask(mo)
+                except FileNotFoundError:
+                    print('Could not load mask: %s' % mo)
+                    raise FileNotFoundError('Could not load mask: %s' % mo)
+        except FileNotFoundError as exc:
+            last_exception = sys.exc_info()
         if ex is None:
-            print('Could not load %s 2D file: for FSN %d' % (['processed', 'raw'][raw], head.fsn))
+            print('Could not load %s 2D file for FSN %d. Exception: {}' % (['processed', 'raw'][raw], head.fsn, traceback.format_exception(**last_exception)))
             ip.user_ns['badfsns'] = set(ip.user_ns['badfsns'])
             ip.user_ns['badfsns'].add(head.fsn)
             continue
