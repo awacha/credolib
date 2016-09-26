@@ -7,6 +7,7 @@ source:
 
 build:
   number: {{ GIT_DESCRIBE_NUMBER }}
+  noarch_python: True
 
 requirements:
   build:
