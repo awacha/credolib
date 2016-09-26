@@ -1,0 +1,41 @@
+package:
+  name: credolib
+  version: {{ GIT_DESCRIBE_TAG }}
+
+source:
+  git_url: ./
+
+build:
+  number: {{ GIT_DESCRIBE_NUMBER }}
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - setuptools_scm
+    - matplotlib
+    - ipython
+    - ipy_table
+    - sastool
+    - numpy
+    - ipywidgets
+
+  run:
+    - python
+    - numpy
+    - scipy
+    - matplotlib
+    - ipython
+    - ipy_table
+    - sastool
+    - numpy
+    - ipywidgets
+
+about:
+  home: https://github.com/awacha/credolib
+  license: 3-clause BSD license
+  dev_url: https://github.com/awacha/credolib.git
+  license_family: BSD
+  license_file: LICENSE
+  summary: A bunch of tools for the Jupyter notebook-based CREDO data processing environment
+  description: A bunch of tools for the Jupyter notebook-based CREDO data processing environment
