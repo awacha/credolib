@@ -2,8 +2,8 @@ __all__ = ['summarize', 'unite', 'subtract_bg']
 
 import numbers
 import os
-import traceback
 import sys
+import traceback
 
 import ipy_table
 import matplotlib
@@ -53,7 +53,8 @@ def _collect_data_for_summarization(headers, raw, reintegrate, qrange):
         except FileNotFoundError as exc:
             last_exception = sys.exc_info()
         if ex is None:
-            print('Could not load %s 2D file for FSN %d. Exception: {}' % (['processed', 'raw'][raw], head.fsn, traceback.format_exception(**last_exception)))
+            print('Could not load %s 2D file for FSN %d. Exception: {}' % (
+                ['processed', 'raw'][raw], head.fsn, traceback.format_exception(**last_exception)))
             ip.user_ns['badfsns'] = set(ip.user_ns['badfsns'])
             ip.user_ns['badfsns'].add(head.fsn)
             continue
@@ -90,7 +91,7 @@ def _collect_data_for_summarization(headers, raw, reintegrate, qrange):
 
 def _stabilityassessment(headers, data1d, dist, fig_correlmatrices, correlmatrixaxes, std_multiplier,
                          correlmatrix_colormap,
-                         correlmatrix_filename, logarithmic_correlmatrix=True):
+                         correlmatrix_filename, logarithmic_correlmatrix=True, cormaptest=True):
     # calculate and plot correlation matrix
     cmatrix, badidx, rowavg = correlmatrix(data1d, std_multiplier, logarithmic_correlmatrix)
     rowavgmean = rowavg.mean()
@@ -116,8 +117,10 @@ def _stabilityassessment(headers, data1d, dist, fig_correlmatrices, correlmatrix
     tab = [['FSN', 'Date', 'Discrepancy', 'Relative discrepancy ((x-mean(x))/std(x))', 'Quality', 'Quality (cormap)']]
     badfsns = []
     badfsns_datcmp = []
-    matC, matp, matpadj, datcmp_ok = datcmp(*data1d)
-    # datcmp_ok=[not x for x in badidx]
+    if cormaptest:
+        matC, matp, matpadj, datcmp_ok = datcmp(*data1d)
+    else:
+        datcmp_ok = [not x for x in badidx]
     for h, bad, discr, dcmp_ok in zip(headers, badidx, rowavg, datcmp_ok):
         tab.append([h.fsn, h.date.isoformat(), discr, (discr - rowavgmean) / rowavgstd,
                     ["\u2713", "\u2718\u2718\u2718\u2718\u2718"][bad],
@@ -135,7 +138,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
               samples=None, raw=False, late_radavg=True, graph_ncols=3,
               std_multiplier=3, graph_extension='png',
               graph_dpi=80, correlmatrix_colormap='coolwarm',
-              image_colormap='viridis', correlmatrix_logarithmic=True):
+              image_colormap='viridis', correlmatrix_logarithmic=True, cormaptest=True):
     """Summarize scattering patterns and curves for all samples defined 
     by the global `allsamplenames`.
     
@@ -210,9 +213,9 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
             writemarkdown("### Distance " + str(dist) + " mm")
             headers_narrowed = [h for h in headers_sample if abs(float(h.distance) - dist) < dist_tolerance]
             distaxes[dist] = fig_2d.add_subplot(
-                    nrows, ncols, distidx + 1)
+                nrows, ncols, distidx + 1)
             correlmatrixaxes[dist] = fig_correlmatrices.add_subplot(
-                    nrows, ncols, distidx + 1)
+                nrows, ncols, distidx + 1)
             # determine the q-range to be used from the qranges argument.
             try:
                 distkey_min = min([np.abs(k - dist)
@@ -229,15 +232,16 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
                 _collect_data_for_summarization(headers_narrowed, raw, reintegrate, qrange)
 
             badfsns, badfsns_datcmp, tab, rowavg[samplename][dist] = _stabilityassessment(
-                    headers_tosave[samplename][dist],
-                    data1d[samplename][dist], dist,
-                    fig_correlmatrices,
-                    correlmatrixaxes[dist], std_multiplier, correlmatrix_colormap,
-                    os.path.join(ip.user_ns['saveto_dir'], 'correlmatrix_%s_%s' % (
-                        samplename,
-                        ('%.2f' % dist).replace('.', '_')) +
-                                 rawpart + '.npz'),
-                    logarithmic_correlmatrix=correlmatrix_logarithmic)
+                headers_tosave[samplename][dist],
+                data1d[samplename][dist], dist,
+                fig_correlmatrices,
+                correlmatrixaxes[dist], std_multiplier, correlmatrix_colormap,
+                os.path.join(ip.user_ns['saveto_dir'], 'correlmatrix_%s_%s' % (
+                    samplename,
+                    ('%.2f' % dist).replace('.', '_')) +
+                             rawpart + '.npz'),
+                logarithmic_correlmatrix=correlmatrix_logarithmic,
+                cormaptest=cormaptest)
 
             if 'badfsns' not in ip.user_ns:
                 ip.user_ns['badfsns'] = {}
@@ -257,8 +261,8 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
             distaxes[dist].set_xlabel('q (' + qunit() + ')')
             distaxes[dist].set_ylabel('q (' + qunit() + ')')
             distaxes[dist].set_title(
-                    '%.2f mm (%d curve%s)' % (dist, len(headers_tosave[samplename][dist]),
-                                              ['', 's'][len(headers_tosave[samplename][dist]) > 1]))
+                '%.2f mm (%d curve%s)' % (dist, len(headers_tosave[samplename][dist]),
+                                          ['', 's'][len(headers_tosave[samplename][dist]) > 1]))
 
             # Plot the curves
             Istd = np.stack([c.Intensity for c in data1d[samplename][dist]], axis=1)
@@ -273,15 +277,15 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
                 onedimstdaxes.loglog(data1d[samplename][dist][0].q, Istd.std(axis=1) / Istd.mean(axis=1) * 100, 'b-')
             if not late_radavg:
                 data1d[samplename][dist] = Curve.average(
-                        *data1d[samplename][dist])
+                    *data1d[samplename][dist])
             else:
                 data1d[samplename][dist] = (
                     data2d[samplename][dist].radial_average(
-                            qrange,
-                            errorpropagation=3,
-                            abscissa_errorpropagation=3, raw_result=False))
+                        qrange,
+                        errorpropagation=3,
+                        abscissa_errorpropagation=3, raw_result=False))
             data1d[samplename][dist].loglog(
-                    label='Average', lw=2, color='k', axes=onedimaxes)
+                label='Average', lw=2, color='k', axes=onedimaxes)
 
             ##Saving image, headers, mask and curve
             # data2d[samplename][dist].write(
@@ -306,7 +310,7 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
             qmin = q_[q_ > 0].min()
             writemarkdown('#### Q-range & flux')
             writemarkdown(
-                    '- $q_{min}$: ' + print_abscissavalue(qmin, headers_tosave[samplename][dist][0].wavelength, dist))
+                '- $q_{min}$: ' + print_abscissavalue(qmin, headers_tosave[samplename][dist][0].wavelength, dist))
             writemarkdown('- $q_{max}$: ' + print_abscissavalue(data1d[samplename][dist].q.max(),
                                                                 headers_tosave[samplename][dist][0].wavelength, dist))
             writemarkdown('- Number of $q$ points: ' + str(len(data1d[samplename][dist])))
@@ -337,21 +341,21 @@ def summarize(reintegrate=True, dist_tolerance=3, qranges=None,
         fig_correlmatrices.suptitle(samplename)
         fig_correlmatrices.tight_layout()
         fig_2d.savefig(
-                os.path.join(ip.user_ns['auximages_dir'],
-                             'averaging2D_' +
-                             samplename + rawpart + '.' + graph_extension),
-                dpi=graph_dpi)
+            os.path.join(ip.user_ns['auximages_dir'],
+                         'averaging2D_' +
+                         samplename + rawpart + '.' + graph_extension),
+            dpi=graph_dpi)
         fig_curves.savefig(
-                os.path.join(ip.user_ns['auximages_dir'],
-                             'averaging1D_' +
-                             samplename + rawpart + '.' + graph_extension),
-                dpi=graph_dpi)
+            os.path.join(ip.user_ns['auximages_dir'],
+                         'averaging1D_' +
+                         samplename + rawpart + '.' + graph_extension),
+            dpi=graph_dpi)
         putlogo(fig_correlmatrices)
         fig_correlmatrices.savefig(
-                os.path.join(ip.user_ns['auximages_dir'],
-                             'correlation_' +
-                             samplename + rawpart + '.' + graph_extension),
-                dpi=graph_dpi)
+            os.path.join(ip.user_ns['auximages_dir'],
+                         'correlation_' +
+                         samplename + rawpart + '.' + graph_extension),
+            dpi=graph_dpi)
         writemarkdown("### Collected images from all distances")
         plt.show()
     writemarkdown("Updated badfsns list:")
@@ -432,7 +436,7 @@ def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_s
         return
     united = None
     graph_nrows = int(
-            np.ceil((len(dists)) / (graph_ncols * 1.0)))
+        np.ceil((len(dists)) / (graph_ncols * 1.0)))
     fig = plt.figure()
     unitedaxis = fig.add_subplot(graph_nrows, graph_ncols, 1)
     factor = 1
@@ -498,7 +502,7 @@ def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_s
     putlogo()
     fig.subplots_adjust(**graph_subplotpars)
     plt.savefig(
-            os.path.join(ip.user_ns['auximages_dir'], 'uniting_' + samplename + '.' + graph_extension), dpi=graph_dpi)
+        os.path.join(ip.user_ns['auximages_dir'], 'uniting_' + samplename + '.' + graph_extension), dpi=graph_dpi)
     print("    United curve spans the following ranges:")
     print("        q_min: ",
           print_abscissavalue(united.q.min(), ip.user_ns['_headers_sample'][samplename][dists[0]][0].wavelength))
@@ -552,8 +556,8 @@ def subtract_bg(samplename, bgname, factor=1, distance=None, disttolerance=2,
             if not disttolerance:
                 if dist not in data1d[bgname]:
                     print(
-                            'Warning: Missing distance %g for background measurement (samplename: %s, background samplename: %s)' % (
-                                dist, samplename, bgname))
+                        'Warning: Missing distance %g for background measurement (samplename: %s, background samplename: %s)' % (
+                            dist, samplename, bgname))
                     continue
                 else:
                     bgdist = dist
@@ -584,7 +588,7 @@ def subtract_bg(samplename, bgname, factor=1, distance=None, disttolerance=2,
         data1d[subname][dist] = data1_s - factor * data1_bg
         data2d[subname][dist] = data2_s - factor * data2_bg
         data1d[subname][dist].save(
-                os.path.join(ip.user_ns['saveto_dir'], subname + '_' + ('%.2f' % dist).replace('.', '_') + '.txt'))
+            os.path.join(ip.user_ns['saveto_dir'], subname + '_' + ('%.2f' % dist).replace('.', '_') + '.txt'))
         ip.user_ns['_headers_sample'][subname][dist] = ip.user_ns['_headers_sample'][samplename][
             dist]  # ugly hack, I have no better idea.
         plt.figure()
