@@ -2,8 +2,8 @@ __all__ = ['summarize', 'unite', 'subtract_bg']
 
 import numbers
 import os
-import traceback
 import sys
+import traceback
 
 import ipy_table
 import matplotlib
@@ -14,17 +14,16 @@ import numpy as np
 from IPython.core.getipython import get_ipython
 from IPython.display import display
 from mpl_toolkits.axes_grid import make_axes_locatable
-from sastool.classes2 import Curve
-from sastool.classes2 import Exposure
+from sastool.classes2 import Curve, Exposure
 from sastool.libconfig import qunit
-from sastool.misc.easylsq import nonlinear_odr, FixedParameter
+from sastool.misc.easylsq import FixedParameter, nonlinear_odr
 from sastool.misc.errorvalue import ErrorValue
 
 from .atsas import datcmp
 from .calculation import correlmatrix
 from .io import get_different_distances, load_exposure
 from .plotting import plotsascurve
-from .utils import writemarkdown, print_abscissavalue, putlogo
+from .utils import print_abscissavalue, putlogo, writemarkdown
 
 
 def _collect_data_for_summarization(headers, raw, reintegrate, qrange):
@@ -381,7 +380,7 @@ def _merge_two_curves(curve1: Curve, curve2: Curve, qmin, qmax, qsep, use_additi
     :param qsep: separating (tailoring) point for the merge
     :type qsep: float
     :return: merged_curve, factor, background, stat
-    :rtype tuple of a sastool.classes.curve.SASCurve and a float
+    :rtype tuple of a sastool.classes2.curve.Curve and a float
     """
     if len(curve1.trim(qmin, qmax)) > len(curve2.trim(qmin, qmax)):
         curve2_interp = curve2.trim(qmin, qmax)

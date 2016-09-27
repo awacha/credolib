@@ -1,10 +1,14 @@
-__all__ = ['load_headers', 'getsascurve', 'getsasexposure', 'getheaders', 'getdists', 'filter_headers']
-from IPython.core.getipython import get_ipython
-from sastool.classes2.loader import Loader
-from sastool.classes2.curve import Curve
-from sastool.classes2.header import Header
-from sastool.classes2.exposure import Exposure
+__all__ = ['load_headers', 'getsascurve', 'getsasexposure', 'getheaders', 'getdists', 'filter_headers', 'load_exposure',
+           'load_mask']
 from typing import List, Tuple, Union
+
+import numpy as np
+from IPython.core.getipython import get_ipython
+from sastool.classes2.curve import Curve
+from sastool.classes2.exposure import Exposure
+from sastool.classes2.header import Header
+from sastool.classes2.loader import Loader
+
 
 def filter_headers(criterion):
     """Filter already loaded headers against some criterion.
@@ -114,3 +118,14 @@ def load_exposure(fsn:int, raw=True, processed=True) -> Exposure:
         except (OSError, ValueError):
             continue
     raise FileNotFoundError('Cannot find exposure for fsn #{:d}'.format(fsn))
+
+
+def load_mask(maskname: str) -> np.ndarray:
+    ip = get_ipython()
+    for l in ip.user_ns['_loaders']:
+        assert isinstance(l, Loader)
+        try:
+            return l.loadmask(maskname)
+        except OSError:
+            continue
+    raise FileNotFoundError('Cannot load mask file {}'.format(maskname))

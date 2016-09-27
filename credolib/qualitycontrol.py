@@ -1,8 +1,5 @@
 __all__ = ['assess_flux_stability', 'sum_measurement_times', 'assess_sample_stability',
            'assess_instrumental_background', 'assess_transmission', 'assess_gc_fit']
-import os
-
-from .io import load_exposure
 
 import ipy_table
 import matplotlib.pyplot as plt
@@ -10,9 +7,10 @@ import numpy as np
 from IPython.core.getipython import get_ipython
 from IPython.display import display
 from matplotlib.colors import LogNorm
-from sastool.classes import SASHeader, SASMask
-from sastool.classes2 import Curve
+from sastool.classes2 import Curve, Exposure
 from sastool.misc.easylsq import nonlinear_leastsquares
+
+from .io import load_exposure, load_mask
 
 
 def assess_flux_stability(samplename='Glassy_Carbon'):
@@ -88,35 +86,31 @@ def assess_sample_stability(end_cutoff=3):
     plt.show()
 
 
-def assess_instrumental_background(Wx=20, Wy=20, emptyname='Empty_Beam', maskname='mask.mat', raw=True):
+def assess_instrumental_background(Wx=20, Wy=20, emptyname='Empty_Beam', maskname='mask.mat'):
     ip = get_ipython()
-    for l in os.listdir(ip.user_ns['saveto_dir']):
-        if not (l.startswith(emptyname) and l.endswith('.npz') and
-                    ((not raw) or ('raw' in l))):
-            continue
-        print(l)
-        I = np.load(os.path.join(ip.user_ns['saveto_dir'], l))['Intensity']
-        header = SASHeader(os.path.join(ip.user_ns['saveto_dir'], l[:-4] + '.log'), plugin='CREDO Reduced')
-        I = I / header['MeasTime']
-        mask = SASMask(maskname, dirs=ip.user_ns['datadirs']).mask
-        m = np.zeros_like(I)
-        print('   Mean intensity per pixel:', I[mask == 1].mean(), 'cps')
-        print('   STD intensity per pixel:', I[mask == 1].std(), 'cps')
-        print('   Total intensity:', I[mask == 1].sum(), 'cps')
+    for dist in ip.user_ns['_headers_sample'][emptyname]:
+        data = ip.user_ns['_data2d'][emptyname][dist]
+        assert isinstance(data, Exposure)
+        intensity = data.intensity / data.header.exposuretime
+        mask = load_mask(maskname).astype(np.bool)
+        m = np.zeros_like(intensity)
+        print('   Mean intensity per pixel:', intensity[mask].mean(), 'cps')
+        print('   STD intensity per pixel:', intensity[mask == 1].std(), 'cps')
+        print('   Total intensity:', intensity[mask == 1].sum(), 'cps')
         for row in range(m.shape[0]):
             for col in range(m.shape[1]):
-                m[row, col] = I[max(row - Wy, 0):min(row + Wy, m.shape[0] - 1),
+                m[row, col] = intensity[max(row - Wy, 0):min(row + Wy, m.shape[0] - 1),
                               max(col - Wx, 0):min(col + Wx, m.shape[1] - 1)][
                     mask[max(row - Wy, 0):min(row + Wy, m.shape[0] - 1),
                     max(col - Wx, 0):
                     min(col + Wx, m.shape[1] - 1)] == 1].mean()
         plt.figure()
         plt.subplot(1, 2, 1)
-        plt.imshow(I, norm=LogNorm())
+        plt.imshow(intensity, norm=LogNorm())
         plt.subplot(1, 2, 2)
         plt.imshow(m)
         plt.tight_layout()
-        plt.suptitle(l)
+        plt.suptitle('Empty beam, {} mm'.format(dist))
 
 
 def assess_transmission():
