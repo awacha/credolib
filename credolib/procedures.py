@@ -383,6 +383,8 @@ def _merge_two_curves(curve1: Curve, curve2: Curve, qmin, qmax, qsep, use_additi
     :return: merged_curve, factor, background, stat
     :rtype tuple of a sastool.classes2.curve.Curve and a float
     """
+    curve1=curve1.sanitize()
+    curve2=curve2.sanitize()
     if len(curve1.trim(qmin, qmax)) > len(curve2.trim(qmin, qmax)):
         curve2_interp = curve2.trim(qmin, qmax)
         curve1_interp = curve1.interpolate(curve2_interp.q)
