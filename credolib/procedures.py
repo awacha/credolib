@@ -388,11 +388,9 @@ def _merge_two_curves(curve1: Curve, curve2: Curve, qmin, qmax, qsep, use_additi
     if len(curve1.trim(qmin, qmax)) > len(curve2.trim(qmin, qmax)):
         curve2_interp = curve2.trim(qmin, qmax)
         curve1_interp = curve1.interpolate(curve2_interp.q)
-        print('Interpolated curve1 to curve2')
     else:
         curve1_interp = curve1.trim(qmin, qmax)
         curve2_interp = curve2.interpolate(curve1_interp.q)
-        print('Interpolated curve2 to curve1')
     if use_additive_constant:
         bg_init = 0
     else:
@@ -400,7 +398,6 @@ def _merge_two_curves(curve1: Curve, curve2: Curve, qmin, qmax, qsep, use_additi
     factor, bg, stat = nonlinear_odr(curve2_interp.Intensity, curve1_interp.Intensity,
                                      curve2_interp.Error, curve1_interp.Error,
                                      lambda x, factor, bg: x * factor + bg, [1.0, bg_init])
-    print('Factor, just determined: {} ({})'.format(factor, type(factor)))
     return Curve.merge(curve1 - bg, curve2 * factor, qsep), factor, bg, stat
 
 
@@ -464,9 +461,7 @@ def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_s
         united, factor1, bg, stat = _merge_two_curves(united,
                                                       data1d[dist2], qmin, qmax, qsep,
                                                       use_additive_constant=additive_constant)
-        print('Factor1: {} ({})'.format(factor1, type(factor1)))
         factor = factor1 * factor
-        print('Factor: {} ({})'.format(factor, type(factor)))
         uniparams['qmin'][idx] = qmin
         uniparams['qmax'][idx] = qmax
         uniparams['qsep'][idx] = qsep
