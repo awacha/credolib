@@ -397,8 +397,9 @@ def _merge_two_curves(curve1: Curve, curve2: Curve, qmin, qmax, qsep, use_additi
         bg_init = FixedParameter(0)
     factor, bg, stat = nonlinear_odr(curve2_interp.Intensity, curve1_interp.Intensity,
                                      curve2_interp.Error, curve1_interp.Error,
-                                     lambda x, factor, bg: x * factor + bg, [1, bg_init])
-    return Curve.merge(curve1 - bg, factor * curve2, qsep), factor, bg, stat
+                                     lambda x, factor, bg: x * factor + bg, [1.0, bg_init])
+    print('Factor, just determined: {} ({})'.format(factor, type(factor)))
+    return Curve.merge(curve1 - bg, curve2 * factor, qsep), factor, bg, stat
 
 
 def _scale_two_exposures(exp1, exp2, qmin, qmax, N=10, use_additive_constant=False):
