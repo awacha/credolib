@@ -52,7 +52,8 @@ def _collect_data_for_summarization(headers, raw, reintegrate, qrange):
         except FileNotFoundError as exc:
             last_exception = sys.exc_info()
         if ex is None:
-            print('Could not load {} 2D file for FSN {:d}. Exception: {}' % (['processed', 'raw'][raw], head.fsn, traceback.format_exception(**last_exception)))
+            print('Could not load {} 2D file for FSN {:d}. Exception: {}'.format(
+                ['processed', 'raw'][raw], head.fsn, '\n'.join(traceback.format_exception(*last_exception))))
             ip.user_ns['badfsns'] = set(ip.user_ns['badfsns'])
             ip.user_ns['badfsns'].add(head.fsn)
             continue
