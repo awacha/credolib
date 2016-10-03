@@ -437,7 +437,7 @@ def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_s
         np.ceil((len(dists)) / (graph_ncols * 1.0)))
     fig = plt.figure()
     unitedaxis = fig.add_subplot(graph_nrows, graph_ncols, 1)
-    factor = 1
+    factor = 1.0
     for idx, dist1, dist2, qmin, qmax, qsep in zip(list(range(len(dists) - 1)),
                                                    dists[:-1], dists[1:],
                                                    uniparams['qmin'],
@@ -460,7 +460,8 @@ def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_s
         united, factor1, bg, stat = _merge_two_curves(united,
                                                       data1d[dist2], qmin, qmax, qsep,
                                                       use_additive_constant=additive_constant)
-        factor = factor * factor1
+        print('Factor1: {} ({})'.format(factor1, type(factor1)))
+        factor = factor1 * factor
         uniparams['qmin'][idx] = qmin
         uniparams['qmax'][idx] = qmax
         uniparams['qsep'][idx] = qsep
@@ -471,7 +472,7 @@ def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_s
             print("        Additive constant is:", bg.tostring(), flush=True)
         print("        Reduced Chi^2 of the ODR fit:", stat['Chi2_reduced'], flush=True)
         print("        DoF of the ODR fit:", stat['DoF'], flush=True)
-        (factor * data1d[dist2] + bg).loglog(axes=ax, label='%.2f mm' % dist2)
+        (data1d[dist2] * factor + bg).loglog(axes=ax, label='%.2f mm' % dist2)
         ax.set_xlabel('q (' + qunit() + ')')
         ax.set_ylabel('$d\\Sigma/d\\Omega$ (cm$^{-1}$ sr$^{-1}$)')
         ax.legend(loc='best')

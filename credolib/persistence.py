@@ -14,7 +14,7 @@ def storedata(filename=None):
         d = {}
         for var in ['_headers', '_loaders', '_data1d', '_data2d', '_data1dunited',
                     'allsamplenames', '_headers_sample', 'badfsns', '_rowavg',
-                    'saveto_dir', 'mask_override',
+                    'saveto_dir',
                     'badfsns_datcmp', 'auximages_dir', 'subtractedsamplenames', 'outputpath', 'saveto_dir_rel',
                     'auximages_dir_rel', 'crd_prefix']:
             try:
