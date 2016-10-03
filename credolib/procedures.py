@@ -463,6 +463,7 @@ def unite(samplename, uniqmin=[], uniqmax=[], uniqsep=[], graph_ncols=2, graph_s
                                                       use_additive_constant=additive_constant)
         print('Factor1: {} ({})'.format(factor1, type(factor1)))
         factor = factor1 * factor
+        print('Factor: {} ({})'.format(factor, type(factor)))
         uniparams['qmin'][idx] = qmin
         uniparams['qmax'][idx] = qmax
         uniparams['qsep'][idx] = qsep
