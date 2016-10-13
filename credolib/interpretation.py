@@ -1,9 +1,10 @@
 __all__ = ['guinieranalysis']
 
+import os
+
 import ipy_table
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 from IPython.core.getipython import get_ipython
 from IPython.display import display
 
@@ -48,7 +49,8 @@ def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunction
         else:
             qrange = qranges[sn]
         print('Using q-range for sample {}: {} <= q <= {}'.format(sn, qrange[0], qrange[1]))
-        curve = getsascurve(sn, dist)[0].trim(*qrange)
+        curve = getsascurve(sn, dist)[0].trim(*qrange).sanitize()
+
         curve.save(sn + '.dat')
         try:
             Rg, I0, qmin, qmax, quality, aggregation = autorg(sn + '.dat')
