@@ -333,9 +333,11 @@ def bodies(filename, bodytypes=None, prefix=None, fit_timeout=10, Ndummyatoms=20
                 fittingresults[b]['Volfit'] = float(s.split(':')[1].strip())
             elif s.startswith(' Goodness of Fit (chi-square)'):
                 fittingresults[b]['Chi2'] = float(s.split(':')[1].strip())
+        fittingresults[b]['stdout_from_bodies'] = stdout
         fittingresults[b]['type'] = b
         fittingresults[b]['bodyparameters'] = bodyparameters
         fittingresults[b]['bodyparameternames'] = bodyparameternames
+        print(fittingresults[b]['stdout_from_bodies'])
         print('Creating DAM model')
         damoutputfile = prefix + '-' + b + '.pdb'
         p = subprocess.Popen(['bodies'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
