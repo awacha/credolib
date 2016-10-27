@@ -72,7 +72,7 @@ def _collect_data_for_summarization(headers, raw, reintegrate, qrange):
             # this happens if reintegrate==True or if reintegrate==False but the curve could not be loaded.
             curve = ex.radial_average(qrange, errorpropagation=3,
                                       abscissa_errorpropagation=3, raw_result=False)
-        curve = curve[curve.q > 0]
+        curve = curve.sanitize()
         data1d.append(curve)
 
         data1d[-1].save(os.path.join(ip.user_ns['saveto_dir'], 'curve_%05d.txt' % head.fsn))
