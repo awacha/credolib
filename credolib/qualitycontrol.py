@@ -187,32 +187,38 @@ def assess_fitting_results(basename, cormap_alpha=0.01):
     plt.figure(figsize=(12, 4))
     plt.subplot2grid((1, 4), (0, 0), colspan=2)
     fir = np.loadtxt(basename + '.fir', skiprows=1)  # q, Iexp, Errexp, Ifitted
-    fit = np.loadtxt(basename + '.fit')  # q, Ismoothed, Ifitted
-    chi2 = calc_chi2(fir[:, 1], fir[:, 2], fir[:, 3])
-    R2 = calc_R2(fir[:, 1], fir[:, 3])
-    # do a cormap test to compare the raw data to the smoothed data
-    smoothed = fit[(fit[:, 0] >= fir[:, 0].min()) & (fit[:, 0] <= fir[:, 0].max()), 1]
-    pvals, Cs, cormaps = cormaptest(fir[:, 1], smoothed)
-    cormapstatuss = ['Reject', 'Accept'][pvals >= cormap_alpha]
     # do a cormap test to compare the raw data and the model.
     pvalf, Cf, cormapf = cormaptest(fir[:, 1], fir[:, 3])
     cormapstatusf = ['Reject', 'Accept'][pvalf >= cormap_alpha]
 
     plt.errorbar(fir[:, 0], fir[:, 1], fir[:, 2], None, 'bo-', label='Raw data')
     plt.plot(fir[:, 0], fir[:, 3], 'r-', label='Fitted')
-    plt.plot(fit[:, 0], fit[:, 1], 'g.-', label='Smoothed, extrapolated')
-    plt.plot(fit[:, 0], fit[:, 2], 'm-', label='Fitted to smoothed, extrapolated')
+    chi2 = calc_chi2(fir[:, 1], fir[:, 2], fir[:, 3])
+    R2 = calc_R2(fir[:, 1], fir[:, 3])
+    try:
+        fit = np.loadtxt(basename + '.fit')  # q, Ismoothed, Ifitted
+        # do a cormap test to compare the raw data to the smoothed data
+        smoothed = fit[(fit[:, 0] >= fir[:, 0].min()) & (fit[:, 0] <= fir[:, 0].max()), 1]
+        pvals, Cs, cormaps = cormaptest(fir[:, 1], smoothed)
+        cormapstatuss = ['Reject', 'Accept'][pvals >= cormap_alpha]
+        plt.plot(fit[:, 0], fit[:, 1], 'g.-', label='Smoothed, extrapolated')
+        plt.plot(fit[:, 0], fit[:, 2], 'm-', label='Fitted to smoothed, extrapolated')
+    except FileNotFoundError:
+        fit = None
+        cormaps = cormapstatuss = pvals = Cs = None
     plt.xscale('log')
     plt.yscale('log')
     plt.legend(loc='best')
     plt.grid(which='both')
-    plt.subplot2grid((1, 4), (0, 2))
-    plt.imshow(cormaps, cmap='gray', interpolation='nearest')
+    if fit is not None:
+        plt.subplot2grid((1, 4), (0, 2))
+        plt.imshow(cormaps, cmap='gray', interpolation='nearest')
+        plt.title('CorMap of the smoothing')
     plt.subplot2grid((1, 4), (0, 3))
     plt.imshow(cormapf, cmap='gray', interpolation='nearest')
-
+    plt.title('CorMap of the fitting')
     print('R2: ', R2)
     print('Chi2: ', chi2)
-    print('Cormap test of the smoothing: {} (p={}, C={}, N={})'.format(cormapstatuss, pvals, Cs, cormaps.shape[0]))
+    if fit is not None:
+        print('Cormap test of the smoothing: {} (p={}, C={}, N={})'.format(cormapstatuss, pvals, Cs, cormaps.shape[0]))
     print('Cormap test of fit: {} (p={}, C={}, N={})'.format(cormapstatusf, pvalf, Cf, cormapf.shape[0]))
-    print(np.abs(cormaps - cormapf).sum())
