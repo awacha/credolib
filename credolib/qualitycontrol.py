@@ -1,5 +1,5 @@
 __all__ = ['assess_flux_stability', 'sum_measurement_times', 'assess_sample_stability',
-           'assess_instrumental_background', 'assess_transmission', 'assess_gc_fit']
+           'assess_instrumental_background', 'assess_transmission', 'assess_gc_fit', 'assess_fitting_results']
 
 import ipy_table
 import matplotlib.pyplot as plt
@@ -8,6 +8,7 @@ from IPython.core.getipython import get_ipython
 from IPython.display import display
 from matplotlib.colors import LogNorm
 from sastool.classes2 import Curve, Exposure
+from sastool.misc.cormap import cormaptest
 from sastool.misc.easylsq import nonlinear_leastsquares
 
 from .io import load_exposure, load_mask
@@ -168,3 +169,50 @@ def assess_gc_fit(reffile=None, gcname='Glassy_Carbon'):
     plt.ylabel('$d\Sigma/d\Omega$ (cm$^{-1}$ sr$^{-1}$)')
     plt.grid(True, which='both')
     plt.draw()
+
+
+def calc_chi2(y, dy, fittedy):
+    return (((y - fittedy) / dy) ** 2).sum() / (len(y) - 1)
+
+
+def calc_R2(y, fittedy):
+    SStot = ((y - np.mean(y)) ** 2).sum()
+    SSres = ((fittedy - y) ** 2).sum()
+    return 1 - SSres / SStot
+
+
+def assess_fitting_results(basename, cormap_alpha=0.01):
+    """Assess the results of a fit based on the .fit and .fir files created by
+    various programs from the ATSAS suite."""
+    plt.figure(figsize=(12, 4))
+    plt.subplot2grid((1, 4), (0, 0), colspan=2)
+    fir = np.loadtxt(basename + '.fir', skiprows=1)  # q, Iexp, Errexp, Ifitted
+    fit = np.loadtxt(basename + '.fit')  # q, Ismoothed, Ifitted
+    chi2 = calc_chi2(fir[:, 1], fir[:, 2], fir[:, 3])
+    R2 = calc_R2(fir[:, 1], fir[:, 3])
+    # do a cormap test to compare the raw data to the smoothed data
+    smoothed = fit[(fit[:, 0] >= fir[:, 0].min()) & (fit[:, 0] <= fir[:, 0].max()), 1]
+    pvals, Cs, cormaps = cormaptest(fir[:, 1], smoothed)
+    cormapstatuss = ['Reject', 'Accept'][pvals >= cormap_alpha]
+    # do a cormap test to compare the raw data and the model.
+    pvalf, Cf, cormapf = cormaptest(fir[:, 1], fir[:, 3])
+    cormapstatusf = ['Reject', 'Accept'][pvalf >= cormap_alpha]
+
+    plt.errorbar(fir[:, 0], fir[:, 1], fir[:, 2], None, 'bo-', label='Raw data')
+    plt.plot(fir[:, 0], fir[:, 3], 'r-', label='Fitted')
+    plt.plot(fit[:, 0], fit[:, 1], 'g.-', label='Smoothed, extrapolated')
+    plt.plot(fit[:, 0], fit[:, 2], 'm-', label='Fitted to smoothed, extrapolated')
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.legend(loc='best')
+    plt.grid(which='both')
+    plt.subplot2grid((1, 4), (0, 2))
+    plt.imshow(cormaps, cmap='gray', interpolation='nearest')
+    plt.subplot2grid((1, 4), (0, 3))
+    plt.imshow(cormapf, cmap='gray', interpolation='nearest')
+
+    print('R2: ', R2)
+    print('Chi2: ', chi2)
+    print('Cormap test of the smoothing: {} (p={}, C={}, N={})'.format(cormapstatuss, pvals, Cs, cormaps.shape[0]))
+    print('Cormap test of fit: {} (p={}, C={}, N={})'.format(cormapstatusf, pvalf, Cf, cormapf.shape[0]))
+    print(np.abs(cormaps - cormapf).sum())
