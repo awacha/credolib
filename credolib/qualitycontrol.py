@@ -196,13 +196,25 @@ def assess_fitting_results(basename, cormap_alpha=0.01):
     chi2 = calc_chi2(fir[:, 1], fir[:, 2], fir[:, 3])
     R2 = calc_R2(fir[:, 1], fir[:, 3])
     try:
-        fit = np.loadtxt(basename + '.fit')  # q, Ismoothed, Ifitted
+        skiprows = 0
+        while True:
+            try:
+                fit = np.loadtxt(basename + '.fit', skiprows=skiprows)  # q, Ismoothed, Ifitted
+                break
+            except ValueError as ve:
+                if ve.args[0].startswith('could not convert string to float'):
+                    skiprows += 1
+                    continue
+                else:
+                    raise
         # do a cormap test to compare the raw data to the smoothed data
         smoothed = fit[(fit[:, 0] >= fir[:, 0].min()) & (fit[:, 0] <= fir[:, 0].max()), 1]
         pvals, Cs, cormaps = cormaptest(fir[:, 1], smoothed)
         cormapstatuss = ['Reject', 'Accept'][pvals >= cormap_alpha]
         plt.plot(fit[:, 0], fit[:, 1], 'g.-', label='Smoothed, extrapolated')
         plt.plot(fit[:, 0], fit[:, 2], 'm-', label='Fitted to smoothed, extrapolated')
+    except ValueError as ve:
+        print('Error while loading file: {}.fit: {}'.format(basename, ve))
     except FileNotFoundError:
         fit = None
         cormaps = cormapstatuss = pvals = Cs = None
