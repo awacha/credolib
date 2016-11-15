@@ -8,13 +8,13 @@ import numpy as np
 from IPython.core.getipython import get_ipython
 from IPython.display import display
 
-from .atsas import autorg, datgnom, shanum, datporod
+from .atsas import autorg, gnom, datgnom, shanum, datporod
 from .io import getsascurve
 from .utils import writemarkdown
 
 
 def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunctions_postfix='', dist=None,
-                    plotguinier=True, graph_extension='.png'):
+                    plotguinier=True, graph_extension='.png', Rmax=None):
     """Perform Guinier analysis on the samples.
 
     Inputs:
@@ -26,14 +26,20 @@ def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunction
             prfunctions_<prfunctions_postfix><graph_extension>
         dist: the sample-to-detector distance to use.
         plotguinier: if Guinier plots are needed.
-        graph_extension: the extension of the saved graph image files."""
+        graph_extension: the extension of the saved graph image files.
+        Rmax: Dict of Rmax parameters. If not found or None, determine automatically using DATGNOM. If found,
+            GNOM is used. The special key '__default__' works in a similar fashion as for `qranges`."""
     figpr = plt.figure()
     ip = get_ipython()
     axpr = figpr.add_subplot(1, 1, 1)
     if qranges is None:
         qranges = {'__default__': (0, 1000000)}
+    if Rmax is None:
+        Rmax = {'__default__': None}
     if '__default__' not in qranges:
         qranges['__default__'] = (0, 1000000)
+    if '__default__' not in Rmax:
+        Rmax['__default__'] = None
     table_autorg = [['Name', 'Rg (nm)', 'I$_0$ (cm$^{-1}$ sr$^{-1}$)',
                      'q$_{min}$ (nm$^{-1}$)', 'q$_{max}$ (nm$^{-1}$)',
                      'qmin*Rg', 'qmax*Rg', 'quality', 'aggregation',
@@ -48,6 +54,10 @@ def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunction
             qrange = qranges['__default__']
         else:
             qrange = qranges[sn]
+        if sn not in Rmax:
+            rmax = Rmax['__default__']
+        else:
+            rmax = Rmax[sn]
         print('Using q-range for sample {}: {} <= q <= {}'.format(sn, qrange[0], qrange[1]))
         curve = getsascurve(sn, dist)[0].trim(*qrange).sanitize()
 
@@ -62,7 +72,10 @@ def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunction
             curve.trim(qmin, qmaxopt).save(sn + '_optrange.dat')
         else:
             curve.trim(qmin, qrange[1]).save(sn + '_optrange.dat')
-        gnompr, metadata = datgnom(sn + '_optrange.dat', Rg=Rg.val, noprint=True)
+        if rmax is None:
+            gnompr, metadata = datgnom(sn + '_optrange.dat', Rg=Rg.val, noprint=True)
+        else:
+            gnompr, metadata = gnom(curve, rmax)
         rg, i0, vporod = datporod(sn + '_optrange.out')
         axpr.errorbar(gnompr[:, 0], gnompr[:, 1], gnompr[:, 2], None, label=sn)
         if plotguinier:

@@ -466,6 +466,38 @@ def gnom(curve, Rmax, outputfilename=None, Npoints_realspace=None, initial_alpha
             initial_alpha = ""
         else:
             initial_alpha = str(initial_alpha)
+        # GNOM questions and our answers:
+        # Printer type                          [ postscr     ] : <ENTER>
+        # Input data, first file                                : <curve.dat in the temporary directory><ENTER>
+        # Output file                           [ gnom.out    ] : <gnom.out in the temporary directory><ENTER>
+        # No of start points to skip            [    0        ] : 0<ENTER>
+        # ... (just GNOM output)
+        # ... (just GNOM output)
+        # Input data, second file               [ none        ] : <ENTER>
+        # No of end points to omit              [    0        ] : 0<ENTER>
+        # ... (just GNOM output)
+        # ... (just GNOM output)
+        # Angular scale (1/2/3/4)               [    1        ] : 2<ENTER>
+        # Plot input dataa                (Y/N) [   Yes       ] : N<ENTER>
+        # File containing expert parameters     [ none        ] : <ENTER>
+        # Kernel already calculated       (Y/N) [   No        ] : N<ENTER>
+        # Type of system        (0/1/2/3/4/5/6) [    0        ] : 0<ENTER>
+        # Zero condition at r=min         (Y/N) [   Yes       ] : Y<ENTER>
+        # Zero condition at r=max         (Y/N) [   Yes       ] : Y<ENTER>
+        #   --  Arbitrary monodisperse system  --
+        #  Rmin=0,  Rmax is maximum particle diameter
+        # Rmax for evaluating p(r)                              : <Rmax * 10><ENTER>
+        # Number of points in real space        [(always different)] : <Npoints_realspace><ENTER>
+        # Kernel-storage file name              [ kern.bin    ] : <ENTER>
+        # Experimental setup            (0/1/2) [    0        ] : 0<ENTER>
+        # Initial ALPHA                         [   0.0       ] : <initial_alpha><ENTER>
+        # Plot alpha distribution         (Y/N) [   Yes       ] : N<ENTER>
+        # Plot results                    (Y/N) [   Yes       ] : N<ENTER>
+        # ... solution ...
+        # Your choice : <ENTER>
+        # Evaluate errors                 (Y/N) [   Yes       ] : Y<ENTER>
+        # Plot p(r) with errors           (Y/N) [   Yes       ] : N<ENTER>
+        # Next data set           (Yes/No/Same) [   No        ] : N<ENTER>
         gnominput = "\n%s\n%s\n0\n\n0\n2\nN\n\nN\n0\nY\nY\n%f\n%s\n\n0\n%s\nN\nN\n\nY\nN\nN\n" % (
             os.path.join(td, 'curve.dat'), os.path.join(td, 'gnom.out'), Rmax * 10, Npoints_realspace, initial_alpha)
         result = subprocess.run(['gnom'], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
