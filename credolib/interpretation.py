@@ -69,13 +69,17 @@ def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunction
             continue
         dmax, nsh, nopt, qmaxopt = shanum(sn + '.dat')
         if qmax_from_shanum:
-            curve.trim(qmin, qmaxopt).save(sn + '_optrange.dat')
+            curve_trim = curve.trim(qmin, qmaxopt)
         else:
-            curve.trim(qmin, qrange[1]).save(sn + '_optrange.dat')
+            curve_trim = curve.trim(qmin, qrange[1])
+        curve_trim.save(sn + '_optrange.dat')
         if rmax is None:
             gnompr, metadata = datgnom(sn + '_optrange.dat', Rg=Rg.val, noprint=True)
         else:
-            gnompr, metadata = gnom(curve, rmax)
+            gnompr, metadata = gnom(curve_trim, rmax)
+            gnompr[:, 0] *= 10
+            metadata['q'] *= 10
+            metadata['qj'] *= 10
         rg, i0, vporod = datporod(sn + '_optrange.out')
         axpr.errorbar(gnompr[:, 0], gnompr[:, 1], gnompr[:, 2], None, label=sn)
         if plotguinier:

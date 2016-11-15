@@ -499,10 +499,19 @@ def gnom(curve, Rmax, outputfilename=None, Npoints_realspace=None, initial_alpha
         # Plot p(r) with errors           (Y/N) [   Yes       ] : N<ENTER>
         # Next data set           (Yes/No/Same) [   No        ] : N<ENTER>
         gnominput = "\n%s\n%s\n0\n\n0\n2\nN\n\nN\n0\nY\nY\n%f\n%s\n\n0\n%s\nN\nN\n\nY\nN\nN\n" % (
-            os.path.join(td, 'curve.dat'), os.path.join(td, 'gnom.out'), Rmax * 10, Npoints_realspace, initial_alpha)
+            os.path.join(td, 'curve.dat'), os.path.join(td, 'gnom.out'), Rmax, Npoints_realspace, initial_alpha)
         result = subprocess.run(['gnom'], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 input=gnominput.encode('utf-8'))
-        gpr = read_gnom_pr(os.path.join(td, 'gnom.out'), True)
+        pr, metadata = read_gnom_pr(os.path.join(td, 'gnom.out'), True)
+        pr[:, 0] /= 10
+        metadata['q'] *= 10
+        metadata['qj'] *= 10
+        metadata['qmin'] *= 10
+        metadata['qmax'] *= 10
+        metadata['dmax'] /= 10
+        metadata['dmin'] /= 10
+        metadata['Rg_guinier'] /= 10
+        metadata['Rg_gnom'] /= 10
         if outputfilename is not None:
             shutil.copy(os.path.join(td, 'gnom.out'), outputfilename)
-    return gpr
+    return pr, metadata
