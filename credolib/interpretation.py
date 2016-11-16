@@ -76,7 +76,7 @@ def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunction
         curve_trim.save(sn + '_optrange.dat')
         if dmax_ is None:
             print('Calling DATGNOM for sample {} with Rg={}, q-range from {} to {}'.format(
-                sn, Rg.val, curve_trim.q.min(), curve.trim.q.max()))
+                sn, Rg.val, curve_trim.q.min(), curve_trim.q.max()))
             gnompr, metadata = datgnom(sn + '_optrange.dat', Rg=Rg.val, noprint=True)
         else:
             print('Calling GNOM for sample {} with Rmax={}, q-range from {} to {}'.format(
