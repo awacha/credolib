@@ -504,14 +504,14 @@ def gnom(curve, Rmax, outputfilename=None, Npoints_realspace=None, initial_alpha
                                 input=gnominput.encode('utf-8'))
         pr, metadata = read_gnom_pr(os.path.join(td, 'gnom.out'), True)
         pr[:, 0] /= 10
-        metadata['q'] *= 10
-        metadata['qj'] *= 10
+        # metadata['q'] *= 10
+        # metadata['qj'] *= 10
         metadata['qmin'] *= 10
         metadata['qmax'] *= 10
-        metadata['dmax'] /= 10
-        metadata['dmin'] /= 10
-        metadata['Rg_guinier'] /= 10
-        metadata['Rg_gnom'] /= 10
+        # metadata['dmax'] /= 10
+        # metadata['dmin'] /= 10
+        # metadata['Rg_guinier'] /= 10
+        #metadata['Rg_gnom'] /= 10
         if outputfilename is not None:
             shutil.copy(os.path.join(td, 'gnom.out'), outputfilename)
     return pr, metadata
