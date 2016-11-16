@@ -70,6 +70,7 @@ def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunction
         dmax, nsh, nopt, qmaxopt = shanum(sn + '.dat')
         if qmax_from_shanum:
             curve_trim = curve.trim(qmin, qmaxopt)
+            rmax = dmax
         else:
             curve_trim = curve.trim(qmin, qrange[1])
         curve_trim.save(sn + '_optrange.dat')
