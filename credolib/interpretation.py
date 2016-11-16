@@ -14,7 +14,7 @@ from .utils import writemarkdown
 
 
 def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunctions_postfix='', dist=None,
-                    plotguinier=True, graph_extension='.png', Rmax=None):
+                    plotguinier=True, graph_extension='.png', dmax=None, dmax_from_shanum=False):
     """Perform Guinier analysis on the samples.
 
     Inputs:
@@ -27,19 +27,19 @@ def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunction
         dist: the sample-to-detector distance to use.
         plotguinier: if Guinier plots are needed.
         graph_extension: the extension of the saved graph image files.
-        Rmax: Dict of Rmax parameters. If not found or None, determine automatically using DATGNOM. If found,
+        dmax: Dict of Dmax parameters. If not found or None, determine automatically using DATGNOM. If found,
             GNOM is used. The special key '__default__' works in a similar fashion as for `qranges`."""
     figpr = plt.figure()
     ip = get_ipython()
     axpr = figpr.add_subplot(1, 1, 1)
     if qranges is None:
         qranges = {'__default__': (0, 1000000)}
-    if Rmax is None:
-        Rmax = {'__default__': None}
+    if dmax is None:
+        dmax = {'__default__': None}
     if '__default__' not in qranges:
         qranges['__default__'] = (0, 1000000)
-    if '__default__' not in Rmax:
-        Rmax['__default__'] = None
+    if '__default__' not in dmax:
+        dmax['__default__'] = None
     table_autorg = [['Name', 'Rg (nm)', 'I$_0$ (cm$^{-1}$ sr$^{-1}$)',
                      'q$_{min}$ (nm$^{-1}$)', 'q$_{max}$ (nm$^{-1}$)',
                      'qmin*Rg', 'qmax*Rg', 'quality', 'aggregation',
@@ -54,10 +54,10 @@ def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunction
             qrange = qranges['__default__']
         else:
             qrange = qranges[sn]
-        if sn not in Rmax:
-            rmax = Rmax['__default__']
+        if sn not in dmax:
+            dmax_ = dmax['__default__']
         else:
-            rmax = Rmax[sn]
+            dmax_ = dmax[sn]
         print('Using q-range for sample {}: {} <= q <= {}'.format(sn, qrange[0], qrange[1]))
         curve = getsascurve(sn, dist)[0].trim(*qrange).sanitize()
 
@@ -67,24 +67,21 @@ def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunction
         except ValueError:
             print('Error running autorg on %s' % sn)
             continue
-        dmax, nsh, nopt, qmaxopt = shanum(sn + '.dat')
+        dmax_shanum, nsh, nopt, qmaxopt = shanum(sn + '.dat')
         if qmax_from_shanum:
             curve_trim = curve.trim(qmin, qmaxopt)
-            rmax = dmax
+            dmax_ = dmax_shanum
         else:
             curve_trim = curve.trim(qmin, qrange[1])
         curve_trim.save(sn + '_optrange.dat')
-        if rmax is None:
+        if dmax_ is None:
             print('Calling DATGNOM for sample {} with Rg={}, q-range from {} to {}'.format(
                 sn, Rg.val, curve_trim.q.min(), curve.trim.q.max()))
             gnompr, metadata = datgnom(sn + '_optrange.dat', Rg=Rg.val, noprint=True)
         else:
             print('Calling GNOM for sample {} with Rmax={}, q-range from {} to {}'.format(
-                sn, rmax, curve_trim.q.min(), curve_trim.q.max()))
-            gnompr, metadata = gnom(curve_trim, rmax)
-            gnompr[:, 0] *= 10
-            metadata['q'] *= 10
-            metadata['qj'] *= 10
+                sn, dmax_, curve_trim.q.min(), curve_trim.q.max()))
+            gnompr, metadata = gnom(curve_trim, dmax_)
         rg, i0, vporod = datporod(sn + '_optrange.out')
         axpr.errorbar(gnompr[:, 0], gnompr[:, 1], gnompr[:, 2], None, label=sn)
         if plotguinier:
@@ -125,7 +122,7 @@ def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunction
                  metadata['qmin'], metadata['qmax'],
                  metadata['dmin'], metadata['dmax'], metadata['totalestimate_corrected'], vporod])
         table_autorg.append([sn, Rg.tostring(extra_digits=2), I0, '%.3f' % qmin, '%.3f' % qmax, qmin * Rg, qmax * Rg,
-                             '%.1f %%' % (quality * 100), aggregation, '%.3f' % dmax, '%.3f' % qmaxopt])
+                             '%.1f %%' % (quality * 100), aggregation, '%.3f' % dmax_shanum, '%.3f' % qmaxopt])
         if plotguinier:
             figsample.tight_layout()
             figsample.savefig(os.path.join(ip.user_ns['auximages_dir'], 'guinier_%s%s' % (sn, graph_extension)),
@@ -134,7 +131,7 @@ def guinieranalysis(samplenames, qranges=None, qmax_from_shanum=True, prfunction
             'Rg_autorg'  : Rg, 'I0_autorg': I0,
             'qmin_autorg': qmin, 'qmax_autorg': qmax,
             'quality'    : quality, 'aggregation': aggregation,
-            'dmax_autorg': dmax, 'qmax_shanum': qmaxopt,
+            'dmax_autorg': dmax_shanum, 'qmax_shanum': qmaxopt,
             'Rg_gnom'    : metadata['Rg_gnom'],
             'I0_gnom'    : metadata['I0_gnom'],
             'qmin_gnom'  : metadata['qmin'],
